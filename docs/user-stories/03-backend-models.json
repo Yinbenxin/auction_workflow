@@ -1,0 +1,133 @@
+[
+  {
+    "description": "T8: Auction SQLAlchemy 模型存在且字段完整",
+    "steps": [
+      "检查 backend/app/models/auction.py 存在",
+      "检查包含 phase_statuses JSONB 字段",
+      "检查包含 version INTEGER 乐观锁字段",
+      "检查 python -m py_compile 通过"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T9: User 模型和 auth 接口存在",
+    "steps": [
+      "检查 backend/app/models/user.py 存在且包含 role 字段",
+      "检查 backend/app/schemas/user.py 存在且包含 LoginRequest 和 TokenResponse",
+      "检查 backend/app/api/v1/auth.py 存在且包含 POST /auth/login 和 GET /auth/me",
+      "检查 login 接口校验用户名密码并返回 JWT"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T10: StrategyVersion 模型和策略状态机存在",
+    "steps": [
+      "检查 backend/app/models/strategy.py 存在且包含 21 个字段",
+      "检查 backend/app/services/strategy_service.py 包含 VALID_TRANSITIONS 状态机",
+      "检查 VALID_TRANSITIONS 包含 DRAFT/PENDING/CONFIRMED/FINAL/VOIDED 五个状态",
+      "检查包含 RED_LINE_FIELDS 集合（6个红线字段）",
+      "检查包含 has_red_line_change 函数",
+      "检查包含 update_with_optimistic_lock 函数"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T11: Confirmation 模型和查询接口存在",
+    "steps": [
+      "检查 backend/app/models/confirmation.py 存在",
+      "检查 backend/app/api/v1/confirmations.py 存在且包含 GET /confirmations 接口",
+      "检查接口支持 target_type 和 target_id 过滤参数"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T12: TaskConfig 模型和接口存在",
+    "steps": [
+      "检查 backend/app/models/task_config.py 存在",
+      "检查 backend/app/api/v1/task_configs.py 包含 GET/PUT/POST confirm 三个接口",
+      "检查 confirm 接口更新 auction.phase_statuses['5'] = 'confirmed'",
+      "检查 status=confirmed 时 PUT 返回 400"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T13: PreExecutionReview 模型和双人复核服务存在",
+    "steps": [
+      "检查 backend/app/models/review.py 存在且包含 configurer_id 和 reviewer_id",
+      "检查 backend/app/services/review_service.py 包含 validate_dual_review 函数",
+      "检查 validate_dual_review 在 configurer_id == reviewer_id 时抛出 400",
+      "检查 validate_checklist_complete 检查 item_1~item_13 全部为 True",
+      "检查 backend/app/api/v1/reviews.py 包含 5 个接口"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T14: ExecutionLog 模型和接口存在",
+    "steps": [
+      "检查 backend/app/models/execution.py 存在",
+      "检查 backend/app/api/v1/executions.py 包含 GET/POST execution-logs 和 POST execution-complete",
+      "检查 GET execution-logs 需要 JWT 鉴权（已修复 Critical #4）",
+      "检查 execution-complete 更新 phase_statuses['7'] = 'completed'"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T15: MonitorRecord 模型和接口存在",
+    "steps": [
+      "检查 backend/app/models/monitor.py 存在",
+      "检查 backend/app/api/v1/monitors.py 包含 GET/POST monitor-records",
+      "检查 GET monitor-records 需要 JWT 鉴权（已修复 Critical #4）",
+      "检查 record_type=anomaly 时 anomaly_type 必填"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T16: Modification 模型和临场修改状态机存在",
+    "steps": [
+      "检查 backend/app/models/modification.py 存在且包含 28 个字段",
+      "检查 backend/app/services/modification_service.py 包含 MOD_VALID_TRANSITIONS（10个状态）",
+      "检查 backend/app/api/v1/modifications.py 包含 9 个接口",
+      "检查 reject_modification 正确记录 approved_by（已修复 Critical #2）",
+      "检查 approve_modification 校验申请人不能审批自己（已修复 Important #8）"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T17: Retrospective 模型和5步提交校验存在",
+    "steps": [
+      "检查 backend/app/models/retrospective.py 存在",
+      "检查 backend/app/services/retrospective_service.py 包含 validate_retrospective_submit",
+      "检查 step3 查询 modifications 表而非 execution_logs（已修复 Critical #3）",
+      "检查 backend/app/api/v1/retrospectives.py 包含 4 个接口"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T17b: RectificationItem 模型和接口存在",
+    "steps": [
+      "检查 backend/app/models/rectification.py 存在",
+      "检查 backend/app/api/v1/rectifications.py 包含 5 个接口",
+      "检查 measures 和 due_date 为必填字段"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T18: Auction API 和阶段门控存在",
+    "steps": [
+      "检查 backend/app/api/v1/auctions.py 包含 7 个接口",
+      "检查包含 PHASE_GATES 字典和 check_phase_gate 函数",
+      "检查 basic-info/confirm 更新 phase_statuses['1'] = 'confirmed'",
+      "检查 history-analysis 接口有阶段门控校验"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T19: dependencies.py UUID 类型修复",
+    "steps": [
+      "检查 backend/app/dependencies.py 中 get_current_user 将 user_id 解析为 UUID 而非 int（已修复 Critical #1）",
+      "检查 require_role 工厂函数存在且校验 current_user.role",
+      "检查 python -m py_compile 通过"
+    ],
+    "passes": true
+  }
+]

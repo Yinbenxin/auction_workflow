@@ -5,7 +5,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, ForeignKey, String, Text, text
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMPTZ, UUID as PGUUID
+from sqlalchemy import TIMESTAMP
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+
+TIMESTAMPTZ = TIMESTAMP(timezone=True)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base

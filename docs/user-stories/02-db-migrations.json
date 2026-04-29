@@ -1,0 +1,93 @@
+[
+  {
+    "description": "T1: auctions 表迁移文件存在且字段完整",
+    "steps": [
+      "检查 backend/migrations/versions/002_create_auctions.py 存在",
+      "检查包含 phase_statuses JSONB 字段",
+      "检查包含 version INTEGER 乐观锁字段",
+      "检查包含 created_by FK→users",
+      "检查 downgrade() 包含 drop_table"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T2: strategy_versions 表迁移文件存在且字段完整",
+    "steps": [
+      "检查 backend/migrations/versions/003_create_strategy_versions.py 存在",
+      "检查包含 6 个红线字段：bid_price/bid_quantity/bid_time_points/trigger_conditions/fallback_plan/applicable_scenarios",
+      "检查包含 risk_level 字段",
+      "检查包含 previous_version_id 自引用 FK",
+      "检查包含 UNIQUE(auction_id, version_code) 约束"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T3: confirmations 表迁移文件存在",
+    "steps": [
+      "检查 backend/migrations/versions/004_create_confirmations.py 存在",
+      "检查包含 target_type 和 target_id 字段（多态关联）",
+      "检查包含 action 字段（confirm/reject）"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T4: task_configs 表迁移文件存在",
+    "steps": [
+      "检查 backend/migrations/versions/005_create_task_configs.py 存在",
+      "检查包含 tasks JSONB 字段",
+      "检查包含 attachments JSONB 字段",
+      "检查包含 status 字段（pending/confirmed）"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T5: pre_execution_reviews 表迁移文件存在且双人复核字段完整",
+    "steps": [
+      "检查 backend/migrations/versions/006_create_pre_execution_reviews.py 存在",
+      "检查包含 checklist JSONB 字段",
+      "检查包含 configurer_id 和 reviewer_id 两个独立字段（双人复核）",
+      "检查两个字段均有 FK→users"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T6: modifications 表迁移文件存在且 28 字段完整",
+    "steps": [
+      "检查 backend/migrations/versions/007_create_execution_monitor_modification.py 存在",
+      "检查 modifications 表包含 reason NOT NULL 和 impact_scope NOT NULL",
+      "检查包含 is_emergency BOOLEAN 字段",
+      "检查包含 deviation_reason 和 post_explanation 字段",
+      "检查包含 approved_by/reviewed_by/executed_by 三个审批人字段"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T7: retrospectives 表迁移文件存在",
+    "steps": [
+      "检查 backend/migrations/versions/008_create_retrospectives.py 存在",
+      "检查包含 emergency_explanation 字段",
+      "检查包含 status 字段（draft/submitted）"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T7b: rectification_items 表迁移文件存在",
+    "steps": [
+      "检查 backend/migrations/versions/009_create_rectification_items.py 存在",
+      "检查包含 measures NOT NULL 和 due_date NOT NULL",
+      "检查包含 status 字段（PENDING/IN_PROGRESS/COMPLETED/DELAYED/CLOSED）",
+      "检查包含 evidence JSONB 字段"
+    ],
+    "passes": true
+  },
+  {
+    "description": "DB 迁移链完整（001→009）",
+    "steps": [
+      "检查 001_create_users.py down_revision = None",
+      "检查 002_create_auctions.py down_revision = '001'",
+      "检查 009_create_rectification_items.py down_revision = '008'",
+      "所有迁移文件 python -m py_compile 通过"
+    ],
+    "passes": true
+  }
+]

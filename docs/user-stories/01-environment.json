@@ -1,0 +1,27 @@
+[
+  {
+    "description": "T0: 后端项目结构已初始化",
+    "steps": [
+      "检查 backend/requirements.txt 存在且包含 fastapi、sqlalchemy、alembic、python-jose、passlib",
+      "检查 backend/app/main.py 存在且包含 FastAPI app 定义",
+      "检查 backend/app/core/config.py 存在且包含 BaseSettings",
+      "检查 backend/app/core/database.py 存在且包含 get_db 异步生成器",
+      "检查 backend/app/core/security.py 存在且包含 create_access_token 和 verify_token",
+      "检查 backend/app/dependencies.py 存在且包含 get_current_user 和 require_role",
+      "检查 backend/alembic.ini 存在",
+      "检查 backend/migrations/env.py 存在"
+    ],
+    "passes": true
+  },
+  {
+    "description": "T0-fe: 前端项目结构已初始化",
+    "steps": [
+      "检查 frontend/package.json 存在且包含 vue、vite、element-plus、pinia、axios",
+      "检查 frontend/src/main.ts 存在且注册了 ElementPlus、Pinia、Router",
+      "检查 frontend/src/router/index.ts 存在且包含登录守卫",
+      "检查 frontend/src/stores/auth.ts 存在且包含 login、logout、fetchMe",
+      "检查 frontend/src/api/index.ts 存在且包含 JWT 注入拦截器"
+    ],
+    "passes": true
+  }
+]
