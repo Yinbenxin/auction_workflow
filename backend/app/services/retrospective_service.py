@@ -81,12 +81,13 @@ async def validate_retrospective_submit(
 
     # ------------------------------------------------------------------
     # 步骤 3：应急执行必须补说明
-    # 查 execution_logs 表中待补说明的应急记录
+    # 查 modifications 表中待补说明的应急记录（is_emergency=true 且状态未闭合）
     # ------------------------------------------------------------------
     open_emergency_result = await session.execute(
         text(
-            "SELECT COUNT(*) FROM execution_logs "
+            "SELECT COUNT(*) FROM modifications "
             "WHERE auction_id = :auction_id "
+            "AND is_emergency = true "
             "AND status IN ('PENDING_POST_EXPLANATION', 'PENDING_DEVIATION_EXPLANATION')"
         ),
         {"auction_id": str(auction_id)},

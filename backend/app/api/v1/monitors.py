@@ -6,15 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user, require_role
 from app.models.monitor import MonitorRecord
 from app.schemas.monitor import MonitorRecordCreate, MonitorRecordResponse
 
 router = APIRouter()
 
 
-def ok(data=None, message: str = "ok") -> dict:
-    return {"code": 0, "data": data, "message": message}
+from app.api.v1.auth import ok
 
 
 @router.get("", response_model=dict)
@@ -22,6 +21,7 @@ async def list_monitor_records(
     auction_id: UUID,
     record_type: Optional[str] = Query(None, description="过滤类型：normal / anomaly"),
     db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
 ) -> dict:
     """获取指定竞拍的监控记录列表，按 recorded_at 倒序。"""
     stmt = select(MonitorRecord).where(MonitorRecord.auction_id == auction_id)

@@ -9,10 +9,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username: string, password: string): Promise<void> {
     const data = await authApi.login({ username, password })
-    const accessToken = (data as unknown as { access_token: string }).access_token
-    token.value = accessToken
-    localStorage.setItem('token', accessToken)
-    await fetchMe()
+    const resp = data as unknown as { access_token: string; user: User }
+    token.value = resp.access_token
+    localStorage.setItem('token', resp.access_token)
+    // 直接从登录响应填充 user，避免额外 GET /auth/me 请求
+    if (resp.user) {
+      user.value = resp.user
+    } else {
+      await fetchMe()
+    }
   }
 
   function logout(): void {

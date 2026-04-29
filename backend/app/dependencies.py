@@ -21,7 +21,24 @@ async def get_current_user(
     replace the stub below once app.models.user is implemented.
     """
     payload = verify_token(token)
-    user_id: int = payload.get("user_id")
+    user_id_str: str | None = payload.get("user_id")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 缺少 user_id 字段",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    from uuid import UUID as _UUID
+
+    try:
+        user_id = _UUID(user_id_str)
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 中 user_id 格式无效",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Deferred import — avoids circular dependency before models are defined
     from app.models import User  # noqa: PLC0415  (will exist after T1)

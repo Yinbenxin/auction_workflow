@@ -149,6 +149,12 @@ async def approve_modification(
 ) -> dict:
     """审批通过（strategy_owner 角色）。PENDING_APPROVAL → PENDING_REVIEW。"""
     mod = await get_modification_or_404(db, auction_id, mid)
+    # 申请人不能审批自己提交的修改
+    if mod.requested_by == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="申请人不能审批自己提交的临场修改申请",
+        )
     transition_mod_status(mod.status, "PENDING_REVIEW")
 
     now = datetime.now(timezone.utc)
@@ -183,10 +189,11 @@ async def reject_modification(
     transition_mod_status(mod.status, "REJECTED")
 
     now = datetime.now(timezone.utc)
+    original_status = mod.status  # 在 mutation 前捕获原始状态
     mod.status = "REJECTED"
     mod.updated_at = now
 
-    if mod.status == "PENDING_APPROVAL":
+    if original_status == "PENDING_APPROVAL":
         mod.approved_by = current_user.id
         mod.approved_at = now
         mod.approval_comment = body.comment

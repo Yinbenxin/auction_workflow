@@ -106,10 +106,11 @@ async def confirm_task_config(
         select(Auction).where(Auction.id == auction_id)
     )
     auction: Auction | None = auction_result.scalar_one_or_none()
-    if auction is not None:
-        updated_statuses = dict(auction.phase_statuses or {})
-        updated_statuses["5"] = "confirmed"
-        auction.phase_statuses = updated_statuses
+    if auction is None:
+        raise HTTPException(status_code=404, detail="竞拍项目不存在")
+    updated_statuses = dict(auction.phase_statuses or {})
+    updated_statuses["5"] = "confirmed"
+    auction.phase_statuses = updated_statuses
 
     await db.flush()
     await db.refresh(task_config)

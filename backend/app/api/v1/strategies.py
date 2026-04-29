@@ -141,8 +141,9 @@ async def update_strategy(
 
     updates["updated_at"] = datetime.now(timezone.utc)
     await update_with_optimistic_lock(db, StrategyVersion, vid, body.version, updates)
-    await db.refresh(sv)
-    return ok(data=StrategyResponse.model_validate(sv).model_dump())
+    # 重新查询以获取最新数据（乐观锁 UPDATE 后 version 已递增）
+    sv_updated = await get_strategy_or_404(db, auction_id, vid)
+    return ok(data=StrategyResponse.model_validate(sv_updated).model_dump())
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +156,7 @@ async def submit_strategy(
     auction_id: UUID,
     vid: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("strategy_owner")),
 ) -> dict:
     """提交策略版本（DRAFT → PENDING）。"""
     sv = await get_strategy_or_404(db, auction_id, vid)
@@ -308,7 +309,7 @@ async def void_strategy(
     auction_id: UUID,
     vid: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_role("auditor", "strategy_owner")),
 ) -> dict:
     """作废策略版本（任意非 VOIDED 状态 → VOIDED）。历史记录保留。"""
     sv = await get_strategy_or_404(db, auction_id, vid)

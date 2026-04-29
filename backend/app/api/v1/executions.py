@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user, require_role
 from app.models.auction import Auction
 from app.models.execution import ExecutionLog
 from app.schemas.execution import ExecutionLogCreate, ExecutionLogResponse
@@ -14,14 +14,14 @@ from app.schemas.execution import ExecutionLogCreate, ExecutionLogResponse
 router = APIRouter()
 
 
-def ok(data=None, message: str = "ok") -> dict:
-    return {"code": 0, "data": data, "message": message}
+from app.api.v1.auth import ok
 
 
 @router.get("/{auction_id}/execution-logs", response_model=dict)
 async def list_execution_logs(
     auction_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
 ) -> dict:
     """获取指定竞拍的执行日志列表，按 triggered_at 升序排列。"""
     stmt = (
