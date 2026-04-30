@@ -47,4 +47,16 @@ export const auctionApi = {
     apiClient.put(`/auctions/${id}/strategy`, data),
   confirmStrategy: (id: string) =>
     apiClient.post(`/auctions/${id}/strategy/confirm`),
+
+  // 阶段04 审批
+  approveStrategy: (id: string, comment?: string) =>
+    apiClient.post(`/auctions/${id}/strategy/approve`, { comment: comment || null }),
+  rejectStrategy: (id: string, comment?: string) =>
+    apiClient.post(`/auctions/${id}/strategy/reject`, { comment: comment || null }),
+
+  // 阶段06 任务配置审批
+  approveTaskConfig: (id: string, comment?: string) =>
+    apiClient.post(`/auctions/${id}/task-config/approve`, { comment: comment || null }),
+  rejectTaskConfig: (id: string, comment?: string) =>
+    apiClient.post(`/auctions/${id}/task-config/reject`, { comment: comment || null }),
 }

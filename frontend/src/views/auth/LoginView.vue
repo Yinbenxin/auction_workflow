@@ -43,6 +43,11 @@
             登录
           </el-button>
         </el-form-item>
+
+        <div class="register-link">
+          没有账号？
+          <el-button type="primary" link @click="$router.push('/register')">立即注册</el-button>
+        </div>
       </el-form>
     </el-card>
   </div>
@@ -117,5 +122,11 @@ async function handleSubmit(): Promise<void> {
 
 .login-btn {
   width: 100%;
+}
+
+.register-link {
+  text-align: center;
+  font-size: 13px;
+  color: #606266;
 }
 </style>

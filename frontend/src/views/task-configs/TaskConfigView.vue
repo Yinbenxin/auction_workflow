@@ -1,243 +1,206 @@
 <template>
   <div class="task-config-page">
-    <div class="page-header">
-      <h2>任务配置清单</h2>
-      <el-tag v-if="isConfirmed" type="success" size="large">已确认</el-tag>
+    <div class="page-header" v-if="!props.hideHeader">
+      <div class="page-title">
+        <h2>任务配置清单</h2>
+        <el-tag v-if="isConfirmed" type="success">已确认</el-tag>
+        <span v-if="autosaving" class="autosave-hint">保存中...</span>
+      </div>
+      <div class="header-actions" v-if="!isConfirmed">
+        <el-button size="small" @click="handleImport">导入</el-button>
+        <el-button type="primary" size="small" :icon="Plus" @click="addRow">新增任务</el-button>
+      </div>
     </div>
 
-    <!-- 任务列表 -->
-    <el-card class="section-card">
-      <template #header>
-        <div class="card-header">
-          <span>任务列表</span>
-          <div class="header-actions" v-if="!isConfirmed">
-            <el-button type="default" size="small" @click="handleImport">导入</el-button>
-            <el-button type="primary" size="small" :icon="Plus" @click="addRow">新增任务</el-button>
-          </div>
-        </div>
-      </template>
+    <!-- 任务表格 -->
+    <div class="table-wrapper">
+      <table class="task-table">
+        <colgroup>
+          <col style="width:36px" />   <!-- # -->
+          <col style="width:50px" />   <!-- 申报量 -->
+          <col style="width:150px" />  <!-- 底价选择 -->
+          <col style="width:68px" />   <!-- 上浮价 -->
+          <col style="width:68px" />   <!-- 上限价 -->
+          <col style="width:68px" />   <!-- 保证金 -->
+          <col style="width:150px" />  <!-- 数据变动监测 -->
+          <col style="width:28px" />   <!-- 互斥 -->
+          <col style="width:44px" />   <!-- 验证 -->
+          <col style="width:80px" />   <!-- 成交时间 -->
+          <col style="width:68px" />   <!-- 状态 -->
+          <col style="width:130px" />  <!-- 操作 -->
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>申报量</th>
+            <th>底价选择</th>
+            <th>上浮价</th>
+            <th>上限价</th>
+            <th>保证金</th>
+            <th>数据变动监测</th>
+            <th>互斥</th>
+            <th>验证</th>
+            <th class="sc-time">成交时间</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="tasks.length === 0">
+            <td colspan="12" style="padding: 32px 0; text-align: center; color: #aaa;">
+              暂无任务，点击「新增任务」开始配置
+            </td>
+          </tr>
+          <tr v-for="(row, index) in tasks" :key="index">
+            <!-- # -->
+            <td>{{ index + 1 }}</td>
 
-      <el-table :data="tasks" border stripe style="width: 100%" size="small">
-        <!-- # 序号 -->
-        <el-table-column label="#" width="50" align="center" fixed="left">
-          <template #default="{ $index }">{{ $index + 1 }}</template>
-        </el-table-column>
+            <!-- 申报量 -->
+            <td>
+              <input v-if="!isConfirmed" v-model="row.volume" class="sc-input" style="width:44px" placeholder="量" />
+              <span v-else>{{ row.volume || '—' }}</span>
+            </td>
 
-        <!-- 申报量 -->
-        <el-table-column label="申报量(万方)" prop="volume" width="120" align="center">
-          <template #default="{ row }">
-            <el-input v-if="!isConfirmed" v-model="row.volume" size="small" placeholder="万方" />
-            <span v-else>{{ row.volume }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 底价选择 -->
-        <el-table-column label="底价选择" width="200" align="center">
-          <template #default="{ row }">
-            <template v-if="!isConfirmed">
-              <el-select v-model="row.priceMode" size="small" style="width: 80px; margin-right: 4px">
-                <el-option label="系数" value="coeff" />
-                <el-option label="垫子" value="pad" />
-              </el-select>
-              <template v-if="row.priceMode === 'coeff'">
-                <el-select v-model="row.priceDiffer" size="small" style="width: 100px">
-                  <el-option label="高" value="high" />
-                  <el-option label="次" value="second" />
-                  <el-option label="30%" value="30%" />
-                  <el-option label="40%" value="40%" />
-                  <el-option label="底" value="floor" />
-                  <el-option label="均" value="avg" />
-                </el-select>
+            <!-- 底价选择 -->
+            <td>
+              <template v-if="!isConfirmed">
+                <select v-model="row.priceMode" class="sc-input" style="width:56px">
+                  <option value="coeff">系数</option>
+                  <option value="pad">垫子</option>
+                </select>
+                <select v-if="row.priceMode === 'coeff'" v-model="row.priceDiffer" class="sc-input" style="width:52px; margin-left:3px">
+                  <option value="high">高</option>
+                  <option value="second">次</option>
+                  <option value="30%">30%</option>
+                  <option value="40%">40%</option>
+                  <option value="floor">底</option>
+                  <option value="avg">均</option>
+                </select>
+                <input v-else v-model="row.padVolume" class="sc-input" style="width:52px; margin-left:3px" placeholder="目标量" />
               </template>
-              <template v-else>
-                <el-input v-model="row.padVolume" size="small" style="width: 100px" placeholder="目标量(万方)" />
+              <span v-else>{{ formatPriceMode(row) }}</span>
+            </td>
+
+            <!-- 上浮价 -->
+            <td class="col-narrow">
+              <input v-if="!isConfirmed" v-model="row.priceIncrease" class="sc-input sc-input-narrow" style="width:30px" placeholder="元" />
+              <span v-else>{{ row.priceIncrease || '—' }}</span>
+            </td>
+
+            <!-- 上限价 -->
+            <td class="col-narrow">
+              <input v-if="!isConfirmed" v-model="row.maxPrice" class="sc-input sc-input-narrow" style="width:30px" placeholder="元" />
+              <span v-else>{{ row.maxPrice || '—' }}</span>
+            </td>
+
+            <!-- 保证金 -->
+            <td class="col-narrow">
+              <input v-if="!isConfirmed" v-model="row.priceMargin" class="sc-input sc-input-narrow" style="width:30px" placeholder="元" />
+              <span v-else>{{ row.priceMargin || '—' }}</span>
+            </td>
+
+            <!-- 数据变动监测 -->
+            <td>
+              <template v-if="!isConfirmed">
+                <select v-model="row.dataTriggerType" class="sc-input" style="width:68px">
+                  <option value="">不检查</option>
+                  <option value="change">变化</option>
+                  <option value="stable">不变</option>
+                </select>
+                <input v-model="row.dataTriggerWindow" class="sc-input" style="width:60px; margin-left:3px" placeholder="ms" />
               </template>
-            </template>
-            <span v-else>{{ formatPriceMode(row) }}</span>
-          </template>
-        </el-table-column>
+              <span v-else>{{ formatDataTrigger(row) }}</span>
+            </td>
 
-        <!-- 上浮价 -->
-        <el-table-column label="上浮价(元)" prop="priceIncrease" width="110" align="center">
-          <template #default="{ row }">
-            <el-input v-if="!isConfirmed" v-model="row.priceIncrease" size="small" placeholder="元" />
-            <span v-else>{{ row.priceIncrease }}</span>
-          </template>
-        </el-table-column>
+            <!-- 互斥 -->
+            <td>
+              <input v-if="!isConfirmed" v-model="row.fallbackRef" class="sc-input" style="width:24px" placeholder="#" />
+              <span v-else>{{ row.fallbackRef || '#' }}</span>
+            </td>
 
-        <!-- 上限价 -->
-        <el-table-column label="上限价(元)" prop="maxPrice" width="110" align="center">
-          <template #default="{ row }">
-            <el-input v-if="!isConfirmed" v-model="row.maxPrice" size="small" placeholder="元" />
-            <span v-else>{{ row.maxPrice }}</span>
-          </template>
-        </el-table-column>
+            <!-- 验证 -->
+            <td>
+              <input type="checkbox" v-model="row.isValidate" :disabled="isConfirmed" class="sc-validate-input" />
+            </td>
 
-        <!-- 保证金 -->
-        <el-table-column label="保证金(元)" prop="priceMargin" width="110" align="center">
-          <template #default="{ row }">
-            <el-input v-if="!isConfirmed" v-model="row.priceMargin" size="small" placeholder="元" />
-            <span v-else>{{ row.priceMargin }}</span>
-          </template>
-        </el-table-column>
+            <!-- 成交时间 -->
+            <td class="sc-time">
+              <input v-if="!isConfirmed" v-model="row.triggerTime" class="sc-input sc-time-input" style="width:76px" placeholder="HH:mm:ss.S" />
+              <span v-else class="mono">{{ row.triggerTime || '—' }}</span>
+            </td>
 
-        <!-- 数据变动监测 -->
-        <el-table-column label="数据变动监测" width="200" align="center">
-          <template #default="{ row }">
-            <template v-if="!isConfirmed">
-              <el-select v-model="row.dataTriggerType" size="small" style="width: 90px; margin-right: 4px" clearable placeholder="类型">
-                <el-option label="变化触发" value="change" />
-                <el-option label="不变触发" value="stable" />
-              </el-select>
-              <el-input
-                v-if="row.dataTriggerType"
-                v-model="row.dataTriggerWindow"
-                size="small"
-                style="width: 90px"
-                placeholder="窗口(ms)"
-              />
-            </template>
-            <span v-else>{{ formatDataTrigger(row) }}</span>
-          </template>
-        </el-table-column>
+            <!-- 状态 -->
+            <td>
+              <span class="sc-status" :class="'sc-status-' + row.status">{{ statusLabel(row.status) }}</span>
+            </td>
 
-        <!-- 互斥 -->
-        <el-table-column label="互斥" prop="fallbackRef" width="90" align="center">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isConfirmed"
-              v-model="row.fallbackRef"
-              size="small"
-              placeholder="序号N"
-            />
-            <span v-else>{{ row.fallbackRef || '—' }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 验证 -->
-        <el-table-column label="验证" prop="isValidate" width="70" align="center">
-          <template #default="{ row }">
-            <el-checkbox v-model="row.isValidate" :disabled="isConfirmed" />
-          </template>
-        </el-table-column>
-
-        <!-- 成交时间 -->
-        <el-table-column label="成交时间" prop="triggerTime" width="160" align="center">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isConfirmed"
-              v-model="row.triggerTime"
-              size="small"
-              placeholder="HH:mm:ss.SSS"
-            />
-            <span v-else>{{ row.triggerTime }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 状态 -->
-        <el-table-column label="状态" prop="status" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-
-        <!-- 操作 -->
-        <el-table-column label="操作" width="200" align="center" fixed="right">
-          <template #default="{ row, $index }">
-            <template v-if="!isConfirmed">
-              <el-button
+            <!-- 操作 -->
+            <td style="white-space: nowrap;">
+              <button
                 v-if="row.status === 'pending' || row.status === 'failed'"
-                size="small"
-                text
-                type="warning"
-                @click="pauseRow(row)"
-              >暂停</el-button>
-              <el-button
+                class="sc-pause-btn" @click="pauseRow(row)"
+              >暂停</button>
+              <button
                 v-if="row.status === 'paused'"
-                size="small"
-                text
-                type="success"
-                @click="resumeRow(row)"
-              >恢复</el-button>
-              <el-button size="small" text @click="resetRow(row)">重置</el-button>
-              <el-button size="small" text type="primary" @click="copyRow($index)">复制</el-button>
-              <el-button size="small" text type="danger" :icon="Delete" @click="removeRow($index)" />
-            </template>
-            <template v-else>
-              <el-button
-                v-if="row.status === 'pending' || row.status === 'failed'"
-                size="small"
-                text
-                type="warning"
-                @click="pauseRow(row)"
-              >暂停</el-button>
-              <el-button
-                v-if="row.status === 'paused'"
-                size="small"
-                text
-                type="success"
-                @click="resumeRow(row)"
-              >恢复</el-button>
-              <el-button size="small" text @click="resetRow(row)">重置</el-button>
-            </template>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+                class="sc-resume-btn" @click="resumeRow(row)"
+              >恢复</button>
+              <button v-if="!isConfirmed" class="sc-copy-btn" @click="copyRow(index)">复制</button>
+              <button v-if="!isConfirmed" class="sc-del-btn" @click="removeRow(index)">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- 附件上传 -->
-    <el-card class="section-card">
-      <template #header>
-        <span>附件上传</span>
-      </template>
-
-      <el-upload
-        v-if="!isConfirmed"
-        v-model:file-list="fileList"
-        :action="uploadAction"
-        :headers="uploadHeaders"
-        multiple
-        :on-success="handleUploadSuccess"
-        :on-error="handleUploadError"
-        :on-remove="handleFileRemove"
-        :before-upload="beforeUpload"
-        drag
-        class="upload-area"
-      >
-        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">
-          拖拽文件到此处，或 <em>点击上传</em>
+    <el-card class="section-card" style="margin-top: 20px;">
+      <template #header><span>附件</span></template>
+      <div class="attachment-area">
+        <el-upload
+          v-if="!isConfirmed"
+          :show-file-list="false"
+          accept=".pdf"
+          :http-request="uploadAttachmentRequest"
+          :before-upload="beforeUpload"
+          multiple
+        >
+          <el-button size="small" :loading="uploadingAttachment">上传 PDF</el-button>
+        </el-upload>
+        <div class="attachment-list" v-if="attachments.length">
+          <div v-for="(file, i) in attachments" :key="i" class="attachment-item">
+            <el-icon><Document /></el-icon>
+            <span class="att-name">{{ file.name || file.filename }}</span>
+            <span class="att-size" v-if="file.size">{{ formatFileSize(file.size) }}</span>
+            <el-button link type="primary" size="small" @click="toggleAttachmentPreview(file.url)">
+              {{ attachmentPreviewUrl === file.url ? '收起' : '预览' }}
+            </el-button>
+            <el-button
+              v-if="!isConfirmed"
+              link type="danger" size="small"
+              @click="removeAttachment(i)"
+            >删除</el-button>
+          </div>
         </div>
-        <template #tip>
-          <div class="el-upload__tip">支持任意格式文件，单文件不超过 50MB</div>
-        </template>
-      </el-upload>
-
-      <div v-if="isConfirmed && attachments.length > 0" class="attachment-list">
-        <div v-for="(file, index) in attachments" :key="index" class="attachment-item">
-          <el-icon><Document /></el-icon>
-          <span class="attachment-name">{{ file.name || file.filename }}</span>
-          <span class="attachment-size" v-if="file.size">({{ formatFileSize(file.size) }})</span>
+        <span v-else class="no-attachment">暂无附件</span>
+        <div v-if="attachmentPreviewUrl && attachments.some(a => a.url === attachmentPreviewUrl)" class="pdf-preview">
+          <iframe :src="attachmentPreviewUrl" width="100%" height="600px" />
         </div>
       </div>
-
-      <el-empty v-if="isConfirmed && attachments.length === 0" description="暂无附件" :image-size="60" />
     </el-card>
 
     <!-- 底部操作 -->
-    <div class="action-bar" v-if="!isConfirmed">
-      <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
-      <el-button type="success" :loading="confirming" @click="handleConfirm">确认配置</el-button>
+    <div class="action-bar">
+      <template v-if="!isConfirmed">
+        <el-button type="success" :loading="confirming" @click="handleConfirm">确认配置</el-button>
+      </template>
+      <template v-else>
+        <el-button type="primary" :loading="saving" @click="handleReopen">修改</el-button>
+      </template>
     </div>
 
     <!-- 导入对话框 -->
     <el-dialog v-model="importDialogVisible" title="导入任务列表" width="600px">
-      <el-input
-        v-model="importJson"
-        type="textarea"
-        :rows="12"
-        placeholder="粘贴 JSON 数组..."
-      />
+      <el-input v-model="importJson" type="textarea" :rows="12" placeholder="粘贴 JSON 数组..." />
       <template #footer>
         <el-button @click="importDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmImport">导入</el-button>
@@ -247,11 +210,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, UploadFilled, Document } from '@element-plus/icons-vue'
+import { Plus, Document } from '@element-plus/icons-vue'
 import { taskConfigApi } from '../../api/task_configs'
+
+const props = withDefaults(defineProps<{ hideHeader?: boolean }>(), { hideHeader: false })
 
 // ---- 类型定义 ----
 interface TaskRow {
@@ -277,36 +242,51 @@ interface AttachmentItem {
   url?: string
 }
 
-interface UploadFileItem {
-  name: string
-  size?: number
-  url?: string
-  response?: { url?: string; filename?: string }
-  status?: string
-}
 
 // ---- 路由 ----
 const route = useRoute()
 const auctionId = computed(() => route.params.id as string)
 
+const emit = defineEmits<{ (e: 'phase-updated'): void }>()
+
 // ---- 状态 ----
 const configStatus = ref<string>('')
 const tasks = ref<TaskRow[]>([])
 const attachments = ref<AttachmentItem[]>([])
-const fileList = ref<UploadFileItem[]>([])
 const saving = ref(false)
 const confirming = ref(false)
+const uploadingAttachment = ref(false)
+const attachmentPreviewUrl = ref<string | null>(null)
+function toggleAttachmentPreview(url?: string) {
+  if (!url) return
+  attachmentPreviewUrl.value = attachmentPreviewUrl.value === url ? null : url
+}
 const importDialogVisible = ref(false)
 const importJson = ref('')
 
 const isConfirmed = computed(() => configStatus.value === 'confirmed')
 
-// 上传配置
-const uploadAction = computed(() => `/api/v1/auctions/${auctionId.value}/task-config/attachments`)
-const uploadHeaders = computed(() => {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-})
+// 自动保存：tasks 变化后 debounce 1.5s 保存
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+const autosaving = ref(false)
+
+function scheduleAutosave() {
+  if (isConfirmed.value) return
+  if (autosaveTimer) clearTimeout(autosaveTimer)
+  autosaveTimer = setTimeout(async () => {
+    autosaving.value = true
+    try {
+      await taskConfigApi.update(auctionId.value, {
+        tasks: tasks.value,
+        attachments: attachments.value,
+      })
+    } catch {
+      // 静默失败，不打扰用户
+    } finally {
+      autosaving.value = false
+    }
+  }, 1500)
+}
 
 // ---- 工具函数 ----
 function createEmptyRow(): TaskRow {
@@ -335,13 +315,6 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   cancelled: '已取消',
 }
 
-const STATUS_TAG_MAP: Record<string, string> = {
-  pending: 'info',
-  done: 'success',
-  failed: 'danger',
-  paused: 'warning',
-  cancelled: '',
-}
 
 const PRICE_DIFFER_LABEL: Record<string, string> = {
   high: '高',
@@ -356,9 +329,6 @@ function statusLabel(s: string): string {
   return STATUS_LABEL_MAP[s] ?? s
 }
 
-function statusTagType(s: string): string {
-  return STATUS_TAG_MAP[s] ?? ''
-}
 
 function formatPriceMode(row: TaskRow): string {
   if (row.priceMode === 'pad') return `垫子 目标量:${row.padVolume}`
@@ -399,9 +369,6 @@ function resumeRow(row: TaskRow) {
   row.status = 'pending'
 }
 
-function resetRow(row: TaskRow) {
-  row.status = 'pending'
-}
 
 // ---- 导入 ----
 function handleImport() {
@@ -441,19 +408,33 @@ function confirmImport() {
   }
 }
 
-// ---- 上传回调 ----
-function handleUploadSuccess(_response: unknown, file: UploadFileItem) {
-  ElMessage.success(`${file.name} 上传成功`)
+// ---- 附件上传 ----
+async function uploadAttachmentRequest(req: { file: File }) {
+  uploadingAttachment.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', req.file)
+    const token = localStorage.getItem('token')
+    const res = await fetch(`/api/v1/auctions/${auctionId.value}/task-config/attachments`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    })
+    if (!res.ok) throw new Error('上传失败')
+    const meta = await res.json()
+    attachments.value = [...attachments.value, meta.data ?? meta]
+    await taskConfigApi.update(auctionId.value, { tasks: tasks.value, attachments: attachments.value })
+    ElMessage.success(`${req.file.name} 上传成功`)
+  } catch {
+    ElMessage.error(`${req.file.name} 上传失败`)
+  } finally {
+    uploadingAttachment.value = false
+  }
+  return false
 }
 
-function handleUploadError(_err: unknown, file: UploadFileItem) {
-  ElMessage.error(`${file.name} 上传失败`)
-}
-
-function handleFileRemove(file: UploadFileItem) {
-  attachments.value = attachments.value.filter(
-    (a) => (a.name || a.filename) !== file.name,
-  )
+function removeAttachment(index: number) {
+  attachments.value = attachments.value.filter((_, i) => i !== index)
 }
 
 function beforeUpload(file: File): boolean {
@@ -476,35 +457,15 @@ async function loadConfig() {
     configStatus.value = data.status ?? ''
     tasks.value = Array.isArray(data.tasks) ? data.tasks : []
     attachments.value = Array.isArray(data.attachments) ? data.attachments : []
-    fileList.value = attachments.value.map((a) => ({
-      name: a.name || a.filename || '',
-      size: a.size,
-      url: a.url,
-      status: 'success',
-    }))
   } catch {
     tasks.value = []
     attachments.value = []
     configStatus.value = ''
   }
+  // 加载完成后再启动自动保存监听，避免初始化时触发覆盖
+  watch(tasks, scheduleAutosave, { deep: true })
 }
 
-// ---- 保存 ----
-async function handleSave() {
-  saving.value = true
-  try {
-    await taskConfigApi.update(auctionId.value, {
-      tasks: tasks.value,
-      attachments: attachments.value,
-    })
-    ElMessage.success('保存成功')
-  } catch (err: unknown) {
-    const error = err as { message?: string }
-    ElMessage.error(error?.message || '保存失败')
-  } finally {
-    saving.value = false
-  }
-}
 
 // ---- 确认配置 ----
 async function handleConfirm() {
@@ -526,11 +487,31 @@ async function handleConfirm() {
     await taskConfigApi.confirm(auctionId.value)
     configStatus.value = 'confirmed'
     ElMessage.success('配置已确认')
+    emit('phase-updated')
   } catch (err: unknown) {
     const error = err as { message?: string }
     ElMessage.error(error?.message || '确认失败')
   } finally {
     confirming.value = false
+  }
+}
+
+// ---- 修改（回退已确认状态） ----
+async function handleReopen() {
+  saving.value = true
+  try {
+    await taskConfigApi.update(auctionId.value, {
+      tasks: tasks.value,
+      attachments: attachments.value,
+    })
+    configStatus.value = 'pending'
+    ElMessage.success('已回退为可编辑状态')
+    emit('phase-updated')
+  } catch (err: unknown) {
+    const error = err as { message?: string }
+    ElMessage.error(error?.message || '操作失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -550,25 +531,26 @@ onMounted(() => {
 .page-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.page-header h2 {
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
   color: #303133;
 }
 
-.section-card {
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.autosave-hint {
+  font-size: 12px;
+  color: #909399;
 }
 
 .header-actions {
@@ -576,25 +558,188 @@ onMounted(() => {
   gap: 8px;
 }
 
-.upload-area {
+/* 表格容器 */
+.table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 420px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fff;
+  margin-bottom: 20px;
+  scroll-behavior: smooth;
+}
+
+/* 插件风格表格 */
+.task-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.task-table th,
+.task-table td {
+  border: 1px solid #eee;
+  padding: 5px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.task-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #555;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.task-table tbody tr:hover td {
+  background: #fafafa;
+}
+
+/* 输入框 — 与插件一致 */
+.sc-input {
+  width: 90px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.sc-time-input {
+  width: 140px;
+}
+
+.sc-validate-input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.sc-time { width: 104px; }
+.sc-time-input { width: 95px !important; }
+.col-narrow { width: 52px; }
+.sc-input-narrow { width: 43px !important; }
+
+/* 状态文字 */
+.sc-status { font-size: 12px; font-weight: bold; }
+.sc-status-pending  { color: #f90; }
+.sc-status-done     { color: #0a0; }
+.sc-status-failed   { color: #d93025; }
+.sc-status-cancelled{ color: #aaa; }
+.sc-status-paused   { color: #888; }
+
+/* 操作按钮 */
+.sc-del-btn {
+  padding: 0 8px;
+  height: 22px;
+  background: #f55;
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.sc-pause-btn {
+  padding: 0 6px;
+  height: 22px;
+  background: #f90;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 2px;
+}
+
+.sc-resume-btn {
+  padding: 0 6px;
+  height: 22px;
+  background: #0a0;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 2px;
+}
+
+.sc-copy-btn {
+  padding: 0 6px;
+  height: 22px;
+  background: #4a9eff;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 2px;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.section-card { margin-bottom: 20px; }
+.upload-area { width: 100%; }
+
+.attachment-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
 }
 
 .attachment-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .attachment-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 8px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 14px;
-  color: #606266;
+  font-size: 13px;
+}
+
+.att-name {
+  flex: 1;
+  color: #409eff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-size {
+  color: #909399;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.no-attachment {
+  font-size: 13px;
+  color: #c0c4cc;
+}
+
+.pdf-preview {
+  margin-top: 8px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pdf-preview iframe {
+  display: block;
+  border: none;
 }
 
 .attachment-name {

@@ -21,6 +21,7 @@ from app.schemas.auction import (
     BasicInfoUpdate,
     HistoryAnalysisUpdate,
     StrategyDataUpdate,
+    StrategyApprovalRequest,
 )
 from app.services.strategy_service import update_with_optimistic_lock
 
@@ -33,10 +34,9 @@ router = APIRouter()
 PHASE_GATES: dict[int, object] = {
     2: lambda a: a.phase_statuses.get("1") == "confirmed",
     3: lambda a: True,  # 软阻断，允许继续
-    5: lambda a: a.phase_statuses.get("4") == "has_final_strategy",
-    6: lambda a: a.phase_statuses.get("5") == "confirmed",
-    7: lambda a: a.phase_statuses.get("6") == "passed",
-    10: lambda a: a.phase_statuses.get("7") == "completed",
+    4: lambda a: a.phase_statuses.get("3") == "has_final_strategy",
+    5: lambda a: a.phase_statuses.get("4") == "passed",
+    8: lambda a: a.phase_statuses.get("7") == "completed",
 }
 
 
@@ -453,7 +453,7 @@ async def update_strategy(
 
     update_dict: dict = {"strategy_data": body.strategy_data, "updated_at": datetime.utcnow()}
     phase_statuses = dict(auction.phase_statuses or {})
-    if phase_statuses.get("3") == "confirmed":
+    if phase_statuses.get("3") in ("confirmed", "rejected"):
         phase_statuses["3"] = "in_progress"
         update_dict["phase_statuses"] = phase_statuses
 
@@ -490,6 +490,81 @@ async def confirm_strategy(
         target_id=auction_id,
         action="confirm",
         confirmed_by=current_user.id,
+    )
+    db.add(confirmation)
+    await db.flush()
+    await db.refresh(auction)
+    return ok(data=AuctionResponse.model_validate(auction).model_dump())
+
+
+# POST /auctions/{id}/strategy/approve — 审批通过阶段03策略
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{auction_id}/strategy/approve", response_model=dict)
+async def approve_strategy(
+    auction_id: UUID,
+    body: StrategyApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """审批通过阶段03策略（auditor 角色）。更新 phase_statuses["3"]="has_final_strategy"。"""
+    auction = await get_auction_or_404(db, auction_id)
+    if str((auction.roles or {}).get("auditor")) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅 auditor 可审批策略")
+    if auction.phase_statuses.get("3") != "confirmed":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="策略尚未确认，无法审批")
+
+    new_statuses = {**auction.phase_statuses, "3": "has_final_strategy"}
+    new_phase = max(auction.current_phase, 4)
+    await update_with_optimistic_lock(
+        db, Auction, auction_id, auction.version,
+        {"phase_statuses": new_statuses, "current_phase": new_phase, "updated_at": datetime.utcnow()},
+    )
+
+    confirmation = Confirmation(
+        target_type="strategy_approval",
+        target_id=auction_id,
+        action="approve",
+        confirmed_by=current_user.id,
+        comment=body.comment,
+    )
+    db.add(confirmation)
+    await db.flush()
+    await db.refresh(auction)
+    return ok(data=AuctionResponse.model_validate(auction).model_dump())
+
+
+# POST /auctions/{id}/strategy/reject — 审批驳回阶段03策略
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{auction_id}/strategy/reject", response_model=dict)
+async def reject_strategy(
+    auction_id: UUID,
+    body: StrategyApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """审批驳回阶段03策略（auditor 角色）。更新 phase_statuses["3"]="rejected"，保留驳回意见在 "3_comment"。"""
+    auction = await get_auction_or_404(db, auction_id)
+    if str((auction.roles or {}).get("auditor")) != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅 auditor 可审批策略")
+    if auction.phase_statuses.get("3") != "confirmed":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="策略尚未确认，无法审批")
+
+    new_statuses = {**auction.phase_statuses, "3": "rejected", "3_comment": body.comment or ""}
+    await update_with_optimistic_lock(
+        db, Auction, auction_id, auction.version,
+        {"phase_statuses": new_statuses, "updated_at": datetime.utcnow()},
+    )
+
+    confirmation = Confirmation(
+        target_type="strategy_approval",
+        target_id=auction_id,
+        action="reject",
+        confirmed_by=current_user.id,
+        comment=body.comment,
     )
     db.add(confirmation)
     await db.flush()

@@ -32,8 +32,8 @@
       <template #header>
         <div class="phase-header">
           <span>阶段01 — 竞拍信息收集</span>
-          <el-tag size="small" :type="phaseStatusTag(auction.phase_statuses['1'])">
-            {{ phaseStatusLabel(auction.phase_statuses['1']) }}
+          <el-tag size="small" :type="phaseStatusTag(auction.phase_statuses['1'], 1)">
+            {{ phaseStatusLabel(auction.phase_statuses['1'], 1) }}
           </el-tag>
         </div>
       </template>
@@ -108,8 +108,8 @@
       <template #header>
         <div class="phase-header">
           <span>阶段02 — 历史数据分析</span>
-          <el-tag size="small" :type="phaseStatusTag(auction.phase_statuses['2'])">
-            {{ phaseStatusLabel(auction.phase_statuses['2']) }}
+          <el-tag size="small" :type="phaseStatusTag(auction.phase_statuses['2'], 2)">
+            {{ phaseStatusLabel(auction.phase_statuses['2'], 2) }}
           </el-tag>
         </div>
       </template>
@@ -190,6 +190,19 @@
         </div>
       </template>
 
+      <el-alert
+        v-if="auction.phase_statuses['3'] === 'rejected'"
+        type="error"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        <template #title>审批驳回</template>
+        <template v-if="auction.phase_statuses['3_comment']">
+          驳回意见：{{ auction.phase_statuses['3_comment'] }}
+        </template>
+      </el-alert>
+
       <el-form label-width="120px">
         <el-form-item label="风险等级">
           <el-select v-model="strategyForm.risk_level" :disabled="!canEditStrategy" style="width:160px">
@@ -198,87 +211,182 @@
             <el-option label="高风险" value="HIGH" />
           </el-select>
         </el-form-item>
-        <el-form-item label="申报价格">
+        <el-form-item label="限价">
           <el-input-number v-model="strategyForm.bid_price" :precision="2" :min="0" :disabled="!canEditStrategy" />
         </el-form-item>
         <el-form-item label="申报数量">
           <el-input-number v-model="strategyForm.bid_quantity" :precision="0" :min="0" :disabled="!canEditStrategy" />
         </el-form-item>
-        <el-form-item label="申报时点">
-          <el-input v-model="strategyForm.bid_time_points" type="textarea" :rows="2" placeholder="描述申报时点安排..." :disabled="!canEditStrategy" />
-        </el-form-item>
-        <el-form-item label="触发条件">
-          <el-input v-model="strategyForm.trigger_conditions" type="textarea" :rows="3" placeholder="描述触发条件..." :disabled="!canEditStrategy" />
+        <el-form-item label="标准方案">
+          <el-input v-model="strategyForm.trigger_conditions" type="textarea" :rows="3" placeholder="描述标准方案..." :disabled="!canEditStrategy" />
         </el-form-item>
         <el-form-item label="兜底方案">
           <el-input v-model="strategyForm.fallback_plan" type="textarea" :rows="3" placeholder="描述兜底方案..." :disabled="!canEditStrategy" />
-        </el-form-item>
-        <el-form-item label="适用场景">
-          <el-input v-model="strategyForm.applicable_scenarios" type="textarea" :rows="2" placeholder="描述适用场景..." :disabled="!canEditStrategy" />
-        </el-form-item>
-        <el-form-item label="预授权操作">
-          <el-input v-model="strategyForm.pre_authorized_actions" type="textarea" :rows="2" placeholder="描述预授权操作..." :disabled="!canEditStrategy" />
         </el-form-item>
         <el-form-item label="风险说明">
           <el-input v-model="strategyForm.risk_notes" type="textarea" :rows="2" placeholder="风险说明..." :disabled="!canEditStrategy" />
         </el-form-item>
       </el-form>
 
-      <div class="phase-actions">
+      <div class="phase-actions" v-if="isStrategyOwner">
         <el-button
-          v-if="isStrategyOwner && auction.phase_statuses['3'] === 'confirmed'"
+          v-if="['confirmed', 'has_final_strategy'].includes(auction.phase_statuses['3'] ?? '')"
           type="primary"
           :loading="savingStrategy"
           @click="handleSaveStrategy"
         >
           修改
         </el-button>
-        <el-button
-          v-if="isStrategyOwner && auction.phase_statuses['3'] !== 'confirmed'"
+        <template v-else>
+          <el-button type="primary" :loading="savingStrategy" @click="handleSaveStrategy">保存</el-button>
+          <el-button type="success" :loading="confirmingStrategy" @click="handleConfirmAndSaveStrategy">确认</el-button>
+        </template>
+      </div>
+
+      <!-- 审批操作（策略已确认/已驳回/已通过时显示审批区） -->
+      <div
+        v-if="['confirmed', 'has_final_strategy', 'rejected'].includes(auction.phase_statuses['3'] ?? '')"
+        style="margin-top: 16px; border-top: 1px solid #ebeef5; padding-top: 16px;"
+      >
+        <div style="font-weight: 500; margin-bottom: 12px; color: #606266;">策略审批</div>
+
+        <template v-if="isAuditor && auction.phase_statuses['3'] === 'confirmed'">
+          <el-form label-position="top">
+            <el-form-item label="审批说明">
+              <el-input
+                v-model="rejectComment"
+                type="textarea"
+                :rows="3"
+                placeholder="请填写审批说明（选填）"
+              />
+            </el-form-item>
+          </el-form>
+          <div class="phase-actions">
+            <el-button type="success" :loading="approvingStrategy" @click="handleApproveStrategy">通过</el-button>
+            <el-button type="danger" plain :loading="rejectingStrategy" @click="handleRejectStrategy">驳回</el-button>
+          </div>
+        </template>
+
+        <el-alert
+          v-if="auction.phase_statuses['3'] === 'confirmed' && !isAuditor"
+          title="等待审批"
+          type="info"
+          show-icon
+          :closable="false"
+        />
+        <el-alert
+          v-if="auction.phase_statuses['3'] === 'has_final_strategy'"
+          title="审批通过"
           type="success"
-          :loading="confirmingStrategy"
-          @click="handleConfirmAndSaveStrategy"
-        >
-          确认
-        </el-button>
+          show-icon
+          :closable="false"
+        />
+        <el-alert
+          v-if="auction.phase_statuses['3'] === 'rejected'"
+          title="审批驳回"
+          type="error"
+          show-icon
+          :closable="false"
+        />
       </div>
     </el-card>
 
-    <!-- 阶段04：策略审批 -->
-    <div v-if="auction && selectedPhase === 4" class="phase-card phase-inline">
-      <StrategyListView
-        :inline-mode="true"
-        @navigate-to-form="(vid: string) => strategyVid = vid"
-      />
-    </div>
+    <!-- 阶段04：任务配置 -->
+    <el-card class="phase-card" v-if="auction && selectedPhase === 4">
+      <template #header>
+        <div class="phase-header">
+          <span>阶段04 — 任务配置</span>
+          <el-tag size="small" :type="phaseStatusTag(auction.phase_statuses['4'])">
+            {{ phaseStatusLabel(auction.phase_statuses['4']) }}
+          </el-tag>
+        </div>
+      </template>
 
-    <!-- 阶段05：任务配置 -->
+      <el-alert
+        v-if="auction.phase_statuses['4'] === 'rejected'"
+        type="error"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        <template #title>审批驳回</template>
+        <template v-if="auction.phase_statuses['4_comment']">
+          驳回意见：{{ auction.phase_statuses['4_comment'] }}
+        </template>
+      </el-alert>
+
+      <TaskConfigView @phase-updated="fetchAuction" :hide-header="true" />
+
+      <!-- 审批区（已确认/已通过/已驳回时显示） -->
+      <div
+        v-if="['confirmed', 'passed', 'rejected'].includes(auction.phase_statuses['4'] ?? '')"
+        style="margin-top: 16px; border-top: 1px solid #ebeef5; padding-top: 16px;"
+      >
+        <div style="font-weight: 500; margin-bottom: 12px; color: #606266;">配置审批</div>
+
+        <template v-if="isReviewer && auction.phase_statuses['4'] === 'confirmed'">
+          <el-form label-position="top">
+            <el-form-item label="审批说明">
+              <el-input
+                v-model="taskConfigComment"
+                type="textarea"
+                :rows="3"
+                placeholder="请填写审批说明（选填）"
+              />
+            </el-form-item>
+          </el-form>
+          <div class="phase-actions">
+            <el-button type="success" :loading="approvingTaskConfig" @click="handleApproveTaskConfig">通过</el-button>
+            <el-button type="danger" plain :loading="rejectingTaskConfig" @click="handleRejectTaskConfig">驳回</el-button>
+          </div>
+        </template>
+
+        <el-alert
+          v-if="auction.phase_statuses['4'] === 'confirmed' && !isReviewer"
+          title="等待审批"
+          type="info"
+          show-icon
+          :closable="false"
+        />
+        <el-alert
+          v-if="auction.phase_statuses['4'] === 'passed'"
+          title="审批通过"
+          type="success"
+          show-icon
+          :closable="false"
+        />
+        <el-alert
+          v-if="auction.phase_statuses['4'] === 'rejected'"
+          title="审批驳回"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+      </div>
+    </el-card>
+
+    <!-- 阶段05：执行复核 -->
     <div v-if="auction && selectedPhase === 5" class="phase-card phase-inline">
-      <TaskConfigView />
+      <ReviewView :auction="auction" />
     </div>
 
-    <!-- 阶段06：执行前复核 -->
+    <!-- 阶段06：正式执行 -->
     <div v-if="auction && selectedPhase === 6" class="phase-card phase-inline">
-      <ReviewView />
-    </div>
-
-    <!-- 阶段07：正式执行 -->
-    <div v-if="auction && selectedPhase === 7" class="phase-card phase-inline">
       <ExecutionLogView />
     </div>
 
-    <!-- 阶段08：实时监控 -->
-    <div v-if="auction && selectedPhase === 8" class="phase-card phase-inline">
+    <!-- 阶段07：实时监控 -->
+    <div v-if="auction && selectedPhase === 7" class="phase-card phase-inline">
       <MonitorView />
     </div>
 
-    <!-- 阶段09：异常审批 -->
-    <div v-if="auction && selectedPhase === 9" class="phase-card phase-inline">
+    <!-- 阶段08：异常审批 -->
+    <div v-if="auction && selectedPhase === 8" class="phase-card phase-inline">
       <ModificationView />
     </div>
 
-    <!-- 阶段10：结果复盘 -->
-    <div v-if="auction && selectedPhase === 10" class="phase-card phase-inline">
+    <!-- 阶段09：结果复盘 -->
+    <div v-if="auction && selectedPhase === 9" class="phase-card phase-inline">
       <RetrospectiveView />
       <RectificationView />
     </div>
@@ -295,7 +403,6 @@ import type { AttachmentMeta } from '../../api/auctions'
 import { usersApi } from '../../api/users'
 import type { Auction, User } from '../../api/types'
 import { useAuthStore } from '../../stores/auth'
-import StrategyListView from '../strategies/StrategyListView.vue'
 import TaskConfigView from '../task-configs/TaskConfigView.vue'
 import ReviewView from '../reviews/ReviewView.vue'
 import ExecutionLogView from '../executions/ExecutionLogView.vue'
@@ -331,15 +438,23 @@ const strategyForm = reactive({
   risk_level: 'NORMAL',
   bid_price: null as number | null,
   bid_quantity: null as number | null,
-  bid_time_points: '',
   trigger_conditions: '',
   fallback_plan: '',
-  applicable_scenarios: '',
-  pre_authorized_actions: '',
+
   risk_notes: '',
 })
 const savingStrategy = ref(false)
 const confirmingStrategy = ref(false)
+
+// 阶段04 审批
+const approvingStrategy = ref(false)
+const rejectingStrategy = ref(false)
+const rejectComment = ref('')
+
+// 阶段06 任务配置审批
+const approvingTaskConfig = ref(false)
+const rejectingTaskConfig = ref(false)
+const taskConfigComment = ref('')
 
 // PDF 预览
 const previewUrl = ref<string | null>(null)
@@ -363,16 +478,15 @@ function uploadHistoryAnalysisRequest(req: { file: File }) {
 
 // 阶段定义：短名 + 对应角色
 const PHASES = [
-  { num: 1,  short: '信息收集',   role: 'business_owner' },
-  { num: 2,  short: '历史分析',   role: 'data_analyst' },
-  { num: 3,  short: '策略制定',   role: 'strategy_owner' },
-  { num: 4,  short: '策略审批',   role: 'auditor' },
-  { num: 5,  short: '任务配置',   role: 'trader' },
-  { num: 6,  short: '执行复核',   role: 'reviewer' },
-  { num: 7,  short: '正式执行',   role: 'trader' },
-  { num: 8,  short: '实时监控',   role: 'monitor' },
-  { num: 9,  short: '异常审批',   role: 'strategy_owner' },
-  { num: 10, short: '结果复盘',   role: 'retrospective_owner' },
+  { num: 1, short: '信息收集', role: 'business_owner' },
+  { num: 2, short: '历史分析', role: 'data_analyst' },
+  { num: 3, short: '策略制定', role: 'strategy_owner' },
+  { num: 4, short: '任务配置', role: 'trader' },
+  { num: 5, short: '执行复核', role: 'reviewer' },
+  { num: 6, short: '正式执行', role: 'trader' },
+  { num: 7, short: '实时监控', role: 'monitor' },
+  { num: 8, short: '异常审批', role: 'strategy_owner' },
+  { num: 9, short: '结果复盘', role: 'retrospective_owner' },
 ]
 
 const PHASE_LABELS = PHASES.map(p => p.short)
@@ -391,9 +505,18 @@ function phaseTagType(phase: number): 'success' | 'warning' | 'danger' | 'info' 
 
 function phaseCellClass(phaseNum: number) {
   if (!auction.value) return 'phase-wait'
-  const status = auction.value.phase_statuses[String(phaseNum)]
-  const doneStatuses = ['confirmed', 'completed', 'passed', 'executable', 'archived', 'FINAL']
-  if (status && doneStatuses.includes(status)) return 'phase-done'
+  // 只有阶段1~4有 phase_statuses 键，5~9 只靠 current_phase 判断
+  if (phaseNum <= 4) {
+    const status = auction.value.phase_statuses[String(phaseNum)]
+    // 阶段1、2 确认即完成（无审批），阶段3、4 需审批通过才算完成
+    if (phaseNum <= 2) {
+      if (status === 'confirmed' || status === 'completed') return 'phase-done'
+    } else {
+      if (status === 'has_final_strategy' || status === 'passed' || status === 'completed') return 'phase-done'
+      if (status === 'confirmed' || status === 'rejected') return 'phase-active'
+    }
+    if (status === 'in_progress') return 'phase-active'
+  }
   if (phaseNum === auction.value.current_phase) return 'phase-active'
   if (phaseNum < auction.value.current_phase) return 'phase-done'
   return 'phase-wait'
@@ -408,19 +531,25 @@ function ownerName(role: string): string {
   return user ? user.full_name : '—'
 }
 
-function phaseStatusLabel(status: string | undefined): string {
+function phaseStatusLabel(status: string | undefined, phase?: number): string {
   const map: Record<string, string> = {
     pending: '待录入',
     in_progress: '进行中',
-    confirmed: '已确认',
+    // 阶段3、4 确认后进入审批流程；阶段1、2 确认即完成
+    confirmed: (phase && phase <= 2) ? '已通过' : '审批中',
     completed: '已完成',
+    has_final_strategy: '已通过',
+    passed: '已通过',
+    rejected: '已驳回',
   }
   return map[status ?? ''] ?? '待录入'
 }
 
-function phaseStatusTag(status: string | undefined): 'success' | 'warning' | 'info' | '' {
-  if (status === 'confirmed' || status === 'completed') return 'success'
+function phaseStatusTag(status: string | undefined, phase?: number): 'success' | 'warning' | 'info' | 'danger' | '' {
+  if (status === 'has_final_strategy' || status === 'passed' || status === 'completed') return 'success'
+  if (status === 'confirmed') return (phase && phase <= 2) ? 'success' : 'warning'
   if (status === 'in_progress') return 'warning'
+  if (status === 'rejected') return 'danger'
   return 'info'
 }
 
@@ -429,14 +558,12 @@ const currentUserId = computed(() => authStore.user?.id ?? '')
 
 // 阶段点击
 const selectedPhase = ref<number | null>(null)
-const strategyVid = ref<string | null>(null)
 
 function handlePhaseClick(phaseNum: number) {
   if (selectedPhase.value === phaseNum) {
     selectedPhase.value = null
   } else {
     selectedPhase.value = phaseNum
-    if (phaseNum !== 3 && phaseNum !== 4) strategyVid.value = null
   }
 }
 
@@ -450,21 +577,32 @@ const isStrategyOwner = computed(() => {
   return (auction.value.roles || {})['strategy_owner'] === currentUserId.value
 })
 
+const isAuditor = computed(() => {
+  if (!auction.value) return false
+  return (auction.value.roles || {})['auditor'] === currentUserId.value
+})
+
+const isReviewer = computed(() => {
+  if (!auction.value) return false
+  return (auction.value.roles || {})['reviewer'] === currentUserId.value
+})
+
 const canEditBasicInfo = computed(() => isBusinessOwner.value)
 
 const canEditHistoryAnalysis = computed(() => isStrategyOwner.value)
 
-const canEditStrategy = computed(() => isStrategyOwner.value)
+const canEditStrategy = computed(() =>
+  isStrategyOwner.value &&
+  !['confirmed', 'has_final_strategy'].includes(auction.value?.phase_statuses?.['3'] ?? '')
+)
 
 function loadStrategyForm(data: Record<string, unknown>) {
   strategyForm.risk_level = (data.risk_level as string) || 'NORMAL'
   strategyForm.bid_price = (data.bid_price as number | null) ?? null
   strategyForm.bid_quantity = (data.bid_quantity as number | null) ?? null
-  strategyForm.bid_time_points = (data.bid_time_points as string) || ''
   strategyForm.trigger_conditions = (data.trigger_conditions as string) || ''
   strategyForm.fallback_plan = (data.fallback_plan as string) || ''
-  strategyForm.applicable_scenarios = (data.applicable_scenarios as string) || ''
-  strategyForm.pre_authorized_actions = (data.pre_authorized_actions as string) || ''
+
   strategyForm.risk_notes = (data.risk_notes as string) || ''
 }
 
@@ -666,8 +804,71 @@ async function handleConfirmAndSaveStrategy() {
   }
 }
 
+async function handleApproveStrategy() {
+  approvingStrategy.value = true
+  try {
+    await auctionApi.approveStrategy(auctionId.value, rejectComment.value || undefined)
+    ElMessage.success('策略审批通过')
+    rejectComment.value = ''
+    await fetchAuction()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '审批失败')
+  } finally {
+    approvingStrategy.value = false
+  }
+}
+
+async function handleRejectStrategy() {
+  rejectingStrategy.value = true
+  try {
+    await auctionApi.rejectStrategy(auctionId.value, rejectComment.value || undefined)
+    ElMessage.success('策略已驳回')
+    rejectComment.value = ''
+    await fetchAuction()
+    selectedPhase.value = 3
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '驳回失败')
+  } finally {
+    rejectingStrategy.value = false
+  }
+}
+
+async function handleApproveTaskConfig() {
+  approvingTaskConfig.value = true
+  try {
+    await auctionApi.approveTaskConfig(auctionId.value, taskConfigComment.value || undefined)
+    ElMessage.success('任务配置审批通过')
+    taskConfigComment.value = ''
+    await fetchAuction()
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '审批失败')
+  } finally {
+    approvingTaskConfig.value = false
+  }
+}
+
+async function handleRejectTaskConfig() {
+  rejectingTaskConfig.value = true
+  try {
+    await auctionApi.rejectTaskConfig(auctionId.value, taskConfigComment.value || undefined)
+    ElMessage.success('任务配置已驳回')
+    taskConfigComment.value = ''
+    await fetchAuction()
+    selectedPhase.value = 4
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.message : '驳回失败')
+  } finally {
+    rejectingTaskConfig.value = false
+  }
+}
+
 onMounted(async () => {
   await fetchAuction()
+  // 自动跳转到当前正在执行的阶段
+  if (auction.value) {
+    const phase = Math.min(Math.max(auction.value.current_phase, 1), PHASES.length)
+    selectedPhase.value = phase
+  }
   try {
     users.value = (await usersApi.list()) as unknown as User[]
   } catch {
@@ -866,5 +1067,54 @@ onMounted(async () => {
 .pdf-preview iframe {
   display: block;
   border: none;
+}
+
+/* 阶段04 策略审批只读展示 */
+.strategy-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.strategy-review-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.strategy-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.strategy-review-item.half {
+  flex: 1;
+  min-width: 160px;
+}
+
+.review-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.review-box {
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #303133;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.review-box.multiline {
+  align-items: flex-start;
+  white-space: pre-wrap;
+  min-height: 72px;
+  line-height: 1.6;
 }
 </style>

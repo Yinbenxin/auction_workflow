@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
@@ -63,7 +63,7 @@ async def create_modification(
     current_user=Depends(require_role("trader", "monitor")),
 ) -> dict:
     """提交临场修改申请（trader/monitor 角色）。reason 和 impact_scope 必填。"""
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod = Modification(
         auction_id=auction_id,
         strategy_version_id=body.strategy_version_id,
@@ -105,7 +105,7 @@ async def emergency_execute(
     命中预授权规则 → PENDING_POST_EXPLANATION；
     未命中 → PENDING_DEVIATION_EXPLANATION。
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     if body.is_pre_authorized:
         initial_status = "PENDING_POST_EXPLANATION"
@@ -157,7 +157,7 @@ async def approve_modification(
         )
     transition_mod_status(mod.status, "PENDING_REVIEW")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod.status = "PENDING_REVIEW"
     mod.approved_by = current_user.id
     mod.approved_at = now
@@ -188,7 +188,7 @@ async def reject_modification(
     mod = await get_modification_or_404(db, auction_id, mid)
     transition_mod_status(mod.status, "REJECTED")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     original_status = mod.status  # 在 mutation 前捕获原始状态
     mod.status = "REJECTED"
     mod.updated_at = now
@@ -225,7 +225,7 @@ async def review_modification(
     mod = await get_modification_or_404(db, auction_id, mid)
     transition_mod_status(mod.status, "APPROVED")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod.status = "APPROVED"
     mod.reviewed_by = current_user.id
     mod.reviewed_at = now
@@ -254,7 +254,7 @@ async def review_reject_modification(
     mod = await get_modification_or_404(db, auction_id, mid)
     transition_mod_status(mod.status, "REJECTED")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod.status = "REJECTED"
     mod.reviewed_by = current_user.id
     mod.reviewed_at = now
@@ -283,7 +283,7 @@ async def execute_modification(
     mod = await get_modification_or_404(db, auction_id, mid)
     transition_mod_status(mod.status, "EXECUTED")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod.status = "EXECUTED"
     mod.executed_by = current_user.id
     mod.executed_at = now
@@ -315,7 +315,7 @@ async def post_explanation(
     mod = await get_modification_or_404(db, auction_id, mid)
     transition_mod_status(mod.status, "POST_EXPLAINED")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     mod.status = "POST_EXPLAINED"
     mod.post_explanation = body.post_explanation
     mod.deviation_reason = body.deviation_reason

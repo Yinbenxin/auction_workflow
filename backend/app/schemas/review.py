@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 class ReviewCreate(BaseModel):
     """发起执行前复核（trader 角色）。"""
 
-    strategy_version_id: UUID
+    strategy_version_id: Optional[UUID] = None
 
 
 class ChecklistUpdate(BaseModel):
@@ -27,7 +27,7 @@ class ReviewSubmit(BaseModel):
 class PreExecutionReviewResponse(BaseModel):
     id: UUID
     auction_id: UUID
-    strategy_version_id: UUID
+    strategy_version_id: Optional[UUID]
     checklist: Dict[str, Any]
     status: str
     configurer_id: UUID

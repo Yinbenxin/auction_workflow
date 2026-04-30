@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth import ok
 from app.core.database import get_db
 from app.dependencies import get_current_user, require_role
+from app.models.auction import Auction
 from app.models.confirmation import Confirmation
 from app.models.strategy import StrategyVersion
 from app.schemas.confirmation import ConfirmationResponse
@@ -139,7 +140,7 @@ async def update_strategy(
             detail=f"当前状态 {sv.status!r} 不允许直接更新，仅 DRAFT 状态可修改",
         )
 
-    updates["updated_at"] = datetime.now(timezone.utc)
+    updates["updated_at"] = datetime.utcnow()
     await update_with_optimistic_lock(db, StrategyVersion, vid, body.version, updates)
     # 重新查询以获取最新数据（乐观锁 UPDATE 后 version 已递增）
     sv_updated = await get_strategy_or_404(db, auction_id, vid)
@@ -167,7 +168,7 @@ async def submit_strategy(
 
     await update_with_optimistic_lock(
         db, StrategyVersion, vid, sv.version,
-        {"status": "PENDING", "updated_at": datetime.now(timezone.utc)},
+        {"status": "PENDING", "updated_at": datetime.utcnow()},
     )
     await db.refresh(sv)
     return ok(data=StrategyResponse.model_validate(sv).model_dump())
@@ -201,7 +202,7 @@ async def confirm_strategy(
 
     await update_with_optimistic_lock(
         db, StrategyVersion, vid, sv.version,
-        {"status": "CONFIRMED", "updated_at": datetime.now(timezone.utc)},
+        {"status": "CONFIRMED", "updated_at": datetime.utcnow()},
     )
 
     # 写入确认记录
@@ -240,7 +241,7 @@ async def reject_strategy(
 
     await update_with_optimistic_lock(
         db, StrategyVersion, vid, sv.version,
-        {"status": "DRAFT", "updated_at": datetime.now(timezone.utc)},
+        {"status": "DRAFT", "updated_at": datetime.utcnow()},
     )
 
     # 写入驳回记录
@@ -293,8 +294,15 @@ async def finalize_strategy(
 
     await update_with_optimistic_lock(
         db, StrategyVersion, vid, sv.version,
-        {"status": "FINAL", "updated_at": datetime.now(timezone.utc)},
+        {"status": "FINAL", "updated_at": datetime.utcnow()},
     )
+
+    # 推进竞拍阶段到 05（任务配置）
+    auction = await db.get(Auction, auction_id)
+    if auction and auction.current_phase < 5:
+        auction.current_phase = 5
+        auction.updated_at = datetime.utcnow()
+
     await db.refresh(sv)
     return ok(data=StrategyResponse.model_validate(sv).model_dump())
 
@@ -321,7 +329,7 @@ async def void_strategy(
 
     await update_with_optimistic_lock(
         db, StrategyVersion, vid, sv.version,
-        {"status": "VOIDED", "updated_at": datetime.now(timezone.utc)},
+        {"status": "VOIDED", "updated_at": datetime.utcnow()},
     )
     await db.refresh(sv)
     return ok(data=StrategyResponse.model_validate(sv).model_dump())

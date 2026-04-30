@@ -29,10 +29,10 @@ class PreExecutionReview(Base):
         ForeignKey("auctions.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    strategy_version_id: Mapped[uuid.UUID] = mapped_column(
+    strategy_version_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("strategy_versions.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     checklist: Mapped[dict[str, Any]] = mapped_column(
         JSONB,

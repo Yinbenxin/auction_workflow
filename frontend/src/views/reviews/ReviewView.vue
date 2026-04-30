@@ -26,6 +26,11 @@
       </el-button>
     </el-card>
 
+    <!-- 无复核记录且非 trader -->
+    <el-card v-if="!review && !isTrader && !loading" class="action-card">
+      <p class="hint-text">执行前复核尚未发起，等待交易员发起复核流程。</p>
+    </el-card>
+
     <!-- 复核主体 -->
     <template v-if="review">
       <!-- 复核清单 -->
@@ -138,7 +143,9 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { reviewApi } from '../../api/reviews'
 import { useAuthStore } from '../../stores/auth'
-import type { PreExecutionReview } from '../../api/types'
+import type { PreExecutionReview, Auction } from '../../api/types'
+
+const props = defineProps<{ auction?: Auction }>()
 
 const CHECKLIST_ITEMS = [
   { key: 'strategy_version_confirmed', label: '策略版本已确认为最终版本' },
@@ -161,8 +168,16 @@ const authStore = useAuthStore()
 
 const auctionId = computed(() => route.params.id as string)
 const currentUser = computed(() => authStore.user)
-const isTrader = computed(() => currentUser.value?.role === 'trader')
-const isReviewer = computed(() => currentUser.value?.role === 'reviewer')
+const isTrader = computed(() => {
+  if (!currentUser.value) return false
+  if (props.auction) return (props.auction.roles || {})['trader'] === currentUser.value.id
+  return false
+})
+const isReviewer = computed(() => {
+  if (!currentUser.value) return false
+  if (props.auction) return (props.auction.roles || {})['reviewer'] === currentUser.value.id
+  return false
+})
 const isConfigurer = computed(
   () => review.value?.configurer_id === currentUser.value?.id,
 )
@@ -217,7 +232,7 @@ async function handleInitiate() {
   initiating.value = true
   try {
     // strategy_version_id 由后端从当前竞拍最终审批版本获取，前端传空占位
-    await reviewApi.create(auctionId.value, { strategy_version_id: '' })
+    await reviewApi.create(auctionId.value, { strategy_version_id: null })
     ElMessage.success('复核已发起')
     await fetchReview()
   } catch (err: unknown) {

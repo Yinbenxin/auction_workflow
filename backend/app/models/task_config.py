@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -34,10 +34,10 @@ class TaskConfig(Base):
         nullable=False,
         index=True,
     )
-    strategy_version_id: Mapped[uuid.UUID] = mapped_column(
+    strategy_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("strategy_versions.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     configured_by: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -141,7 +141,7 @@ async def update_retrospective(
     updates = body.model_dump(exclude_none=True)
     for field, value in updates.items():
         setattr(retro, field, value)
-    retro.updated_at = datetime.now(timezone.utc)
+    retro.updated_at = datetime.utcnow()
 
     await db.flush()
     await db.refresh(retro)
@@ -177,7 +177,7 @@ async def submit_retrospective(
     # 5 步校验
     await validate_retrospective_submit(auction_id, retro, db)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     retro.status = "submitted"
     retro.submitted_at = now
     retro.updated_at = now
@@ -185,6 +185,7 @@ async def submit_retrospective(
     phase_statuses = dict(auction.phase_statuses)
     phase_statuses["10"] = "archived"
     auction.phase_statuses = phase_statuses
+    auction.current_phase = 10
 
     await db.flush()
     await db.refresh(retro)

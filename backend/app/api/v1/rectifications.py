@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth import ok
 from app.core.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.dependencies import get_current_user
 from app.models.rectification import RectificationItem
 from app.schemas.rectification import (
     ConfirmRequest,
@@ -60,10 +60,27 @@ async def create_rectification_item(
     rid: UUID,
     body: RectificationCreate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(require_role("retrospective_owner")),
+    current_user=Depends(get_current_user),
 ) -> dict:
-    """创建整改事项（retrospective_owner 角色）。measures 和 due_date 必填。"""
+    """创建整改事项（该竞拍的 retrospective_owner 角色）。measures 和 due_date 必填。"""
     await _get_retrospective_or_404(rid, db)
+
+    # 权限校验：只有该竞拍的 retrospective_owner 可创建整改事项
+    from app.models.retrospective import Retrospective  # noqa: PLC0415
+    from app.models.auction import Auction  # noqa: PLC0415
+    retro_result = await db.execute(select(Retrospective).where(Retrospective.id == rid))
+    retro = retro_result.scalar_one_or_none()
+    has_permission = False
+    if retro:
+        auction_result = await db.execute(select(Auction).where(Auction.id == retro.auction_id))
+        auction = auction_result.scalar_one_or_none()
+        if auction:
+            has_permission = (auction.roles or {}).get("retrospective_owner") == str(current_user.id)
+    if not has_permission:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": 403, "data": None, "message": "只有复盘负责人可创建整改事项"},
+        )
 
     item = RectificationItem(
         retrospective_id=rid,
@@ -122,9 +139,22 @@ async def update_rectification_item(
     """
     item = await _get_item_or_404(iid, db)
 
-    # 权限校验：只有责任人或 retrospective_owner 可更新
+    # 权限校验：只有责任人或该竞拍的 retrospective_owner 可更新
     is_assignee = str(item.assignee_id) == str(current_user.id)
-    is_retro_owner = current_user.role == "retrospective_owner"
+    from app.models.retrospective import Retrospective  # noqa: PLC0415
+    from app.models.auction import Auction  # noqa: PLC0415
+    retro_result = await db.execute(
+        select(Retrospective).where(Retrospective.id == item.retrospective_id)
+    )
+    retro = retro_result.scalar_one_or_none()
+    is_retro_owner = False
+    if retro:
+        auction_result = await db.execute(
+            select(Auction).where(Auction.id == retro.auction_id)
+        )
+        auction = auction_result.scalar_one_or_none()
+        if auction:
+            is_retro_owner = (auction.roles or {}).get("retrospective_owner") == str(current_user.id)
     if not is_assignee and not is_retro_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -235,9 +265,27 @@ async def confirm_rectification_item(
     """
     item = await _get_item_or_404(iid, db)
 
-    # 权限校验：只有 retrospective_owner 或 business_owner 可确认
-    allowed_roles = ("retrospective_owner", "business_owner")
-    if current_user.role not in allowed_roles:
+    # 权限校验：只有该竞拍的 retrospective_owner 或 business_owner 可确认
+    from app.models.retrospective import Retrospective  # noqa: PLC0415
+    from app.models.auction import Auction  # noqa: PLC0415
+    retro_result = await db.execute(
+        select(Retrospective).where(Retrospective.id == item.retrospective_id)
+    )
+    retro = retro_result.scalar_one_or_none()
+    has_permission = False
+    if retro:
+        auction_result = await db.execute(
+            select(Auction).where(Auction.id == retro.auction_id)
+        )
+        auction = auction_result.scalar_one_or_none()
+        if auction:
+            auction_roles = auction.roles or {}
+            user_id_str = str(current_user.id)
+            has_permission = (
+                auction_roles.get("retrospective_owner") == user_id_str
+                or auction_roles.get("business_owner") == user_id_str
+            )
+    if not has_permission:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": 403, "data": None, "message": "只有复盘负责人或业务负责人可确认整改完成"},

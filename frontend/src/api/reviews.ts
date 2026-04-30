@@ -5,7 +5,7 @@ export const reviewApi = {
   get: (auctionId: string) =>
     apiClient.get<PreExecutionReview>(`/auctions/${auctionId}/review`),
 
-  create: (auctionId: string, data: { strategy_version_id: string }) =>
+  create: (auctionId: string, data: { strategy_version_id: string | null }) =>
     apiClient.post(`/auctions/${auctionId}/review`, data),
 
   updateChecklist: (auctionId: string, checklist: Record<string, boolean>) =>

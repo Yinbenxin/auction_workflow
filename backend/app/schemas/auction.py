@@ -36,6 +36,10 @@ class StrategyDataUpdate(BaseModel):
     version: int  # 乐观锁
 
 
+class StrategyApprovalRequest(BaseModel):
+    comment: Optional[str] = None
+
+
 class AuctionResponse(BaseModel):
     id: UUID
     name: str

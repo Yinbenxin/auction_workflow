@@ -200,24 +200,34 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { modificationApi } from '@/api/modifications'
-import type { Modification } from '@/api/types'
+import { auctionApi } from '@/api/auctions'
+import { useAuthStore } from '@/stores/auth'
+import type { Modification, Auction } from '@/api/types'
 
-// ---- Props ----
-const props = defineProps<{
-  auctionId: string
-  /** 当前登录用户角色，如 trader / strategy_owner / reviewer / monitor / retrospective_owner */
-  userRole: string
-}>()
+// ---- Route & Auth ----
+const route = useRoute()
+const auctionId = computed(() => route.params.id as string)
+const authStore = useAuthStore()
+const currentUserId = computed(() => authStore.user?.id ?? '')
+
+// ---- Auction (for role checks) ----
+const auction = ref<Auction | null>(null)
+
+const hasRole = (role: string) => {
+  if (!auction.value) return false
+  return (auction.value.roles ?? {})[role] === currentUserId.value
+}
 
 // ---- 角色判断 ----
-const isTrader = computed(() => props.userRole === 'trader')
-const isStrategyOwner = computed(() => props.userRole === 'strategy_owner')
-const isReviewer = computed(() => props.userRole === 'reviewer')
-const isRetrospectiveOwner = computed(() => props.userRole === 'retrospective_owner')
-const canSubmitRequest = computed(() => ['trader', 'monitor'].includes(props.userRole))
+const isTrader = computed(() => hasRole('trader'))
+const isStrategyOwner = computed(() => hasRole('strategy_owner'))
+const isReviewer = computed(() => hasRole('reviewer'))
+const isRetrospectiveOwner = computed(() => hasRole('retrospective_owner'))
+const canSubmitRequest = computed(() => hasRole('trader') || hasRole('monitor'))
 
 // ---- 状态映射 ----
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary' | ''
@@ -264,7 +274,7 @@ const modifications = ref<Modification[]>([])
 const loadModifications = async () => {
   loading.value = true
   try {
-    modifications.value = (await modificationApi.list(props.auctionId)) as unknown as Modification[]
+    modifications.value = (await modificationApi.list(auctionId.value)) as unknown as Modification[]
   } catch (e: unknown) {
     ElMessage.error((e as Error).message || '加载失败')
   } finally {
@@ -272,7 +282,14 @@ const loadModifications = async () => {
   }
 }
 
-onMounted(loadModifications)
+onMounted(async () => {
+  try {
+    auction.value = (await auctionApi.get(auctionId.value)) as unknown as Auction
+  } catch {
+    // non-critical for role checks
+  }
+  await loadModifications()
+})
 
 // ---- 提交申请 Dialog ----
 const createDialogVisible = ref(false)
@@ -296,7 +313,7 @@ const submitCreate = async () => {
   if (!valid) return
   submitting.value = true
   try {
-    await modificationApi.create(props.auctionId, createForm.value)
+    await modificationApi.create(auctionId.value, createForm.value)
     ElMessage.success('申请已提交')
     createDialogVisible.value = false
     await loadModifications()
@@ -336,7 +353,7 @@ const submitEmergency = async () => {
   }
   submitting.value = true
   try {
-    await modificationApi.emergencyExecute(props.auctionId, emergencyForm.value)
+    await modificationApi.emergencyExecute(auctionId.value, emergencyForm.value)
     ElMessage.success('应急执行已提交')
     emergencyDialogVisible.value = false
     await loadModifications()
@@ -359,7 +376,7 @@ const handleApprove = async (row: Modification) => {
     return
   }
   try {
-    await modificationApi.approve(props.auctionId, row.id)
+    await modificationApi.approve(auctionId.value, row.id)
     ElMessage.success('审批通过')
     await loadModifications()
   } catch (e: unknown) {
@@ -379,7 +396,7 @@ const handleReview = async (row: Modification) => {
     return
   }
   try {
-    await modificationApi.review(props.auctionId, row.id)
+    await modificationApi.review(auctionId.value, row.id)
     ElMessage.success('复核通过')
     await loadModifications()
   } catch (e: unknown) {
@@ -399,7 +416,7 @@ const handleExecute = async (row: Modification) => {
     return
   }
   try {
-    await modificationApi.execute(props.auctionId, row.id)
+    await modificationApi.execute(auctionId.value, row.id)
     ElMessage.success('已标记执行')
     await loadModifications()
   } catch (e: unknown) {
@@ -434,9 +451,9 @@ const submitReject = async () => {
   submitting.value = true
   try {
     if (type === 'approve') {
-      await modificationApi.reject(props.auctionId, row.id, rejectForm.value.comment)
+      await modificationApi.reject(auctionId.value, row.id, rejectForm.value.comment)
     } else {
-      await modificationApi.reviewReject(props.auctionId, row.id, rejectForm.value.comment)
+      await modificationApi.reviewReject(auctionId.value, row.id, rejectForm.value.comment)
     }
     ElMessage.success('已驳回')
     rejectDialogVisible.value = false
@@ -472,7 +489,7 @@ const submitExplanation = async () => {
   submitting.value = true
   try {
     await modificationApi.postExplanation(
-      props.auctionId,
+      auctionId.value,
       explanationTarget.value.id,
       explanationForm.value,
     )

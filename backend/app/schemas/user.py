@@ -8,14 +8,12 @@ class UserCreate(BaseModel):
     username: str
     password: str
     full_name: str
-    role: str
 
 
 class UserResponse(BaseModel):
     id: UUID
     username: str
     full_name: str
-    role: str
     is_active: bool
     created_at: datetime
 

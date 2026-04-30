@@ -13,9 +13,19 @@ const router = createRouter({
       component: () => import('../views/auth/LoginView.vue'),
     },
     {
+      path: '/register',
+      name: 'Register',
+      component: () => import('../views/auth/RegisterView.vue'),
+    },
+    {
       path: '/auctions',
       name: 'AuctionList',
       component: () => import('../views/auctions/AuctionListView.vue'),
+    },
+    {
+      path: '/profile',
+      name: 'Profile',
+      component: () => import('../views/profile/ProfileView.vue'),
     },
     {
       path: '/auctions/:id',
@@ -78,7 +88,7 @@ const router = createRouter({
 // 路由守卫：未登录跳转 /login
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
-  if (to.name !== 'Login' && !token) {
+  if (to.name !== 'Login' && to.name !== 'Register' && !token) {
     next({ name: 'Login' })
   } else {
     next()

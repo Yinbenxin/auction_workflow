@@ -1,4 +1,5 @@
 from typing import Callable
+from uuid import UUID as _UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -14,12 +15,6 @@ async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Decode JWT, verify it, and return the current user record.
-    Raises HTTP 401 if the token is invalid or the user does not exist.
-    The User model import is deferred to avoid circular imports at bootstrap time;
-    replace the stub below once app.models.user is implemented.
-    """
     payload = verify_token(token)
     user_id_str: str | None = payload.get("user_id")
     if not user_id_str:
@@ -28,8 +23,6 @@ async def get_current_user(
             detail="Token 缺少 user_id 字段",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    from uuid import UUID as _UUID
 
     try:
         user_id = _UUID(user_id_str)
@@ -40,10 +33,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Deferred import — avoids circular dependency before models are defined
-    from app.models import User  # noqa: PLC0415  (will exist after T1)
-
-    from sqlalchemy import select
+    from app.models import User  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -56,24 +47,53 @@ async def get_current_user(
     return user
 
 
-def require_role(*roles: str) -> Callable:
+def require_auction_role(*roles: str) -> Callable:
     """
-    Factory that returns a FastAPI dependency enforcing role membership.
+    Factory that returns a FastAPI dependency enforcing that the current user
+    holds one of the given roles in the auction identified by `auction_id`
+    path parameter.
 
+    The auction's `roles` JSONB field maps role names to user UUIDs (as strings).
     Usage:
-        @router.post("/admin-only")
-        async def admin_endpoint(
-            current_user = Depends(require_role("admin", "super_admin"))
+        @router.post("/{auction_id}/basic-info/confirm")
+        async def confirm(
+            auction_id: UUID,
+            current_user=Depends(require_auction_role("business_owner")),
+            db: AsyncSession = Depends(get_db),
         ):
-            ...
     """
 
-    async def role_checker(current_user=Depends(get_current_user)):
-        if current_user.role not in roles:
+    async def role_checker(
+        auction_id: _UUID,
+        current_user=Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ):
+        from app.models.auction import Auction  # noqa: PLC0415
+        from sqlalchemy import select  # noqa: PLC0415
+
+        result = await db.execute(select(Auction).where(Auction.id == auction_id))
+        auction = result.scalar_one_or_none()
+        if auction is None:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"权限不足，需要角色：{', '.join(roles)}",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="竞拍项目不存在",
             )
-        return current_user
+
+        auction_roles: dict = auction.roles or {}
+        user_id_str = str(current_user.id)
+        for role in roles:
+            if auction_roles.get(role) == user_id_str:
+                return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"权限不足，需要角色：{', '.join(roles)}",
+        )
 
     return role_checker
+
+
+# Keep old name as alias so existing imports don't break immediately
+def require_role(*roles: str) -> Callable:
+    """Deprecated: use require_auction_role. Kept for backward compatibility."""
+    return require_auction_role(*roles)

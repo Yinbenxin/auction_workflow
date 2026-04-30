@@ -118,5 +118,7 @@ async def mark_execution_complete(
     updated_statuses = dict(auction.phase_statuses)
     updated_statuses["7"] = "completed"
     auction.phase_statuses = updated_statuses
+    if auction.current_phase < 8:
+        auction.current_phase = 8
 
     return ok(message="竞拍执行已标记为完成")

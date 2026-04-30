@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -144,12 +144,14 @@ async def submit_review(
     review.status = body.status
     review.comment = body.comment
     review.reviewer_id = current_user.id
-    review.reviewed_at = datetime.now(tz=timezone.utc)
+    review.reviewed_at = datetime.utcnow()
 
     if body.status == "passed":
         phase_statuses = dict(auction.phase_statuses)
-        phase_statuses["6"] = "passed"
+        phase_statuses["5"] = "passed"
         auction.phase_statuses = phase_statuses
+        if auction.current_phase < 6:
+            auction.current_phase = 6
 
     await db.flush()
     await db.refresh(review)
@@ -168,7 +170,7 @@ async def mark_executable(
     """
     auction = await _get_auction_or_404(auction_id, db)
 
-    if auction.phase_statuses.get("6") != "passed":
+    if auction.phase_statuses.get("5") != "passed":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -179,8 +181,10 @@ async def mark_executable(
         )
 
     phase_statuses = dict(auction.phase_statuses)
-    phase_statuses["6"] = "executable"
+    phase_statuses["5"] = "executable"
     auction.phase_statuses = phase_statuses
+    if auction.current_phase < 6:
+        auction.current_phase = 6
 
     await db.flush()
-    return ok(data={"auction_id": str(auction_id), "phase_6_status": "executable"})
+    return ok(data={"auction_id": str(auction_id), "phase_5_status": "executable"})
