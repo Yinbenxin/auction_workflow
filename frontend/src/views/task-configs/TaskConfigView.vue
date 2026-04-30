@@ -10,166 +10,176 @@
       <template #header>
         <div class="card-header">
           <span>任务列表</span>
-          <el-button
-            v-if="!isConfirmed"
-            type="primary"
-            size="small"
-            :icon="Plus"
-            @click="addRow"
-          >
-            新增任务
-          </el-button>
+          <div class="header-actions" v-if="!isConfirmed">
+            <el-button type="default" size="small" @click="handleImport">导入</el-button>
+            <el-button type="primary" size="small" :icon="Plus" @click="addRow">新增任务</el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="tasks" border stripe style="width: 100%">
-        <el-table-column label="任务编号" prop="task_number" width="100" align="center">
+      <el-table :data="tasks" border stripe style="width: 100%" size="small">
+        <!-- # 序号 -->
+        <el-table-column label="#" width="50" align="center" fixed="left">
+          <template #default="{ $index }">{{ $index + 1 }}</template>
+        </el-table-column>
+
+        <!-- 申报量 -->
+        <el-table-column label="申报量(万方)" prop="volume" width="120" align="center">
+          <template #default="{ row }">
+            <el-input v-if="!isConfirmed" v-model="row.volume" size="small" placeholder="万方" />
+            <span v-else>{{ row.volume }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 底价选择 -->
+        <el-table-column label="底价选择" width="200" align="center">
+          <template #default="{ row }">
+            <template v-if="!isConfirmed">
+              <el-select v-model="row.priceMode" size="small" style="width: 80px; margin-right: 4px">
+                <el-option label="系数" value="coeff" />
+                <el-option label="垫子" value="pad" />
+              </el-select>
+              <template v-if="row.priceMode === 'coeff'">
+                <el-select v-model="row.priceDiffer" size="small" style="width: 100px">
+                  <el-option label="高" value="high" />
+                  <el-option label="次" value="second" />
+                  <el-option label="30%" value="30%" />
+                  <el-option label="40%" value="40%" />
+                  <el-option label="底" value="floor" />
+                  <el-option label="均" value="avg" />
+                </el-select>
+              </template>
+              <template v-else>
+                <el-input v-model="row.padVolume" size="small" style="width: 100px" placeholder="目标量(万方)" />
+              </template>
+            </template>
+            <span v-else>{{ formatPriceMode(row) }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 上浮价 -->
+        <el-table-column label="上浮价(元)" prop="priceIncrease" width="110" align="center">
+          <template #default="{ row }">
+            <el-input v-if="!isConfirmed" v-model="row.priceIncrease" size="small" placeholder="元" />
+            <span v-else>{{ row.priceIncrease }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 上限价 -->
+        <el-table-column label="上限价(元)" prop="maxPrice" width="110" align="center">
+          <template #default="{ row }">
+            <el-input v-if="!isConfirmed" v-model="row.maxPrice" size="small" placeholder="元" />
+            <span v-else>{{ row.maxPrice }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 保证金 -->
+        <el-table-column label="保证金(元)" prop="priceMargin" width="110" align="center">
+          <template #default="{ row }">
+            <el-input v-if="!isConfirmed" v-model="row.priceMargin" size="small" placeholder="元" />
+            <span v-else>{{ row.priceMargin }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 数据变动监测 -->
+        <el-table-column label="数据变动监测" width="200" align="center">
+          <template #default="{ row }">
+            <template v-if="!isConfirmed">
+              <el-select v-model="row.dataTriggerType" size="small" style="width: 90px; margin-right: 4px" clearable placeholder="类型">
+                <el-option label="变化触发" value="change" />
+                <el-option label="不变触发" value="stable" />
+              </el-select>
+              <el-input
+                v-if="row.dataTriggerType"
+                v-model="row.dataTriggerWindow"
+                size="small"
+                style="width: 90px"
+                placeholder="窗口(ms)"
+              />
+            </template>
+            <span v-else>{{ formatDataTrigger(row) }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 互斥 -->
+        <el-table-column label="互斥" prop="fallbackRef" width="90" align="center">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isConfirmed"
+              v-model="row.fallbackRef"
+              size="small"
+              placeholder="序号N"
+            />
+            <span v-else>{{ row.fallbackRef || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 验证 -->
+        <el-table-column label="验证" prop="isValidate" width="70" align="center">
+          <template #default="{ row }">
+            <el-checkbox v-model="row.isValidate" :disabled="isConfirmed" />
+          </template>
+        </el-table-column>
+
+        <!-- 成交时间 -->
+        <el-table-column label="成交时间" prop="triggerTime" width="160" align="center">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isConfirmed"
+              v-model="row.triggerTime"
+              size="small"
+              placeholder="HH:mm:ss.SSS"
+            />
+            <span v-else>{{ row.triggerTime }}</span>
+          </template>
+        </el-table-column>
+
+        <!-- 状态 -->
+        <el-table-column label="状态" prop="status" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+
+        <!-- 操作 -->
+        <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row, $index }">
-            <el-input
-              v-if="!isConfirmed"
-              v-model="row.task_number"
-              size="small"
-              placeholder="编号"
-            />
-            <span v-else>{{ row.task_number }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="任务时间" prop="task_time" width="160" align="center">
-          <template #default="{ row }">
-            <el-time-picker
-              v-if="!isConfirmed"
-              v-model="row.task_time"
-              size="small"
-              format="HH:mm:ss"
-              value-format="HH:mm:ss"
-              placeholder="选择时间"
-              style="width: 100%"
-            />
-            <span v-else>{{ row.task_time }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="价格" prop="price" width="120" align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isConfirmed"
-              v-model="row.price"
-              size="small"
-              :precision="2"
-              :min="0"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span v-else>{{ row.price }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="数量" prop="quantity" width="120" align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isConfirmed"
-              v-model="row.quantity"
-              size="small"
-              :min="0"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span v-else>{{ row.quantity }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="触发条件" prop="trigger_condition" min-width="140" align="center">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isConfirmed"
-              v-model="row.trigger_condition"
-              size="small"
-              placeholder="触发条件"
-            />
-            <span v-else>{{ row.trigger_condition }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="任务顺序" prop="task_order" width="90" align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isConfirmed"
-              v-model="row.task_order"
-              size="small"
-              :min="1"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <span v-else>{{ row.task_order }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="启停状态" prop="enabled" width="90" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.enabled"
-              :disabled="isConfirmed"
-              active-text="启"
-              inactive-text="停"
-            />
-          </template>
-        </el-table-column>
-
-        <el-table-column label="垫子策略" prop="pad_strategy" width="130" align="center">
-          <template #default="{ row }">
-            <el-select
-              v-if="!isConfirmed"
-              v-model="row.pad_strategy"
-              size="small"
-              placeholder="请选择"
-              style="width: 100%"
-            >
-              <el-option label="无" value="none" />
-              <el-option label="固定垫子" value="fixed" />
-              <el-option label="动态垫子" value="dynamic" />
-              <el-option label="跟随垫子" value="follow" />
-            </el-select>
-            <span v-else>{{ padStrategyLabel(row.pad_strategy) }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="补量策略" prop="supplement_strategy" width="130" align="center">
-          <template #default="{ row }">
-            <el-select
-              v-if="!isConfirmed"
-              v-model="row.supplement_strategy"
-              size="small"
-              placeholder="请选择"
-              style="width: 100%"
-            >
-              <el-option label="无" value="none" />
-              <el-option label="自动补量" value="auto" />
-              <el-option label="手动补量" value="manual" />
-              <el-option label="按比例补量" value="proportional" />
-            </el-select>
-            <span v-else>{{ supplementStrategyLabel(row.supplement_strategy) }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="兜底任务" prop="is_fallback" width="80" align="center">
-          <template #default="{ row }">
-            <el-checkbox
-              v-model="row.is_fallback"
-              :disabled="isConfirmed"
-            />
-          </template>
-        </el-table-column>
-
-        <el-table-column v-if="!isConfirmed" label="操作" width="70" align="center" fixed="right">
-          <template #default="{ $index }">
-            <el-button
-              type="danger"
-              size="small"
-              text
-              :icon="Delete"
-              @click="removeRow($index)"
-            />
+            <template v-if="!isConfirmed">
+              <el-button
+                v-if="row.status === 'pending' || row.status === 'failed'"
+                size="small"
+                text
+                type="warning"
+                @click="pauseRow(row)"
+              >暂停</el-button>
+              <el-button
+                v-if="row.status === 'paused'"
+                size="small"
+                text
+                type="success"
+                @click="resumeRow(row)"
+              >恢复</el-button>
+              <el-button size="small" text @click="resetRow(row)">重置</el-button>
+              <el-button size="small" text type="primary" @click="copyRow($index)">复制</el-button>
+              <el-button size="small" text type="danger" :icon="Delete" @click="removeRow($index)" />
+            </template>
+            <template v-else>
+              <el-button
+                v-if="row.status === 'pending' || row.status === 'failed'"
+                size="small"
+                text
+                type="warning"
+                @click="pauseRow(row)"
+              >暂停</el-button>
+              <el-button
+                v-if="row.status === 'paused'"
+                size="small"
+                text
+                type="success"
+                @click="resumeRow(row)"
+              >恢复</el-button>
+              <el-button size="small" text @click="resetRow(row)">重置</el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -203,45 +213,36 @@
         </template>
       </el-upload>
 
-      <!-- 已上传文件列表（只读模式） -->
       <div v-if="isConfirmed && attachments.length > 0" class="attachment-list">
-        <div
-          v-for="(file, index) in attachments"
-          :key="index"
-          class="attachment-item"
-        >
+        <div v-for="(file, index) in attachments" :key="index" class="attachment-item">
           <el-icon><Document /></el-icon>
           <span class="attachment-name">{{ file.name || file.filename }}</span>
-          <span class="attachment-size" v-if="file.size">
-            ({{ formatFileSize(file.size) }})
-          </span>
+          <span class="attachment-size" v-if="file.size">({{ formatFileSize(file.size) }})</span>
         </div>
       </div>
 
-      <el-empty
-        v-if="isConfirmed && attachments.length === 0"
-        description="暂无附件"
-        :image-size="60"
-      />
+      <el-empty v-if="isConfirmed && attachments.length === 0" description="暂无附件" :image-size="60" />
     </el-card>
 
     <!-- 底部操作 -->
     <div class="action-bar" v-if="!isConfirmed">
-      <el-button
-        type="primary"
-        :loading="saving"
-        @click="handleSave"
-      >
-        保存
-      </el-button>
-      <el-button
-        type="success"
-        :loading="confirming"
-        @click="handleConfirm"
-      >
-        确认配置
-      </el-button>
+      <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
+      <el-button type="success" :loading="confirming" @click="handleConfirm">确认配置</el-button>
     </div>
+
+    <!-- 导入对话框 -->
+    <el-dialog v-model="importDialogVisible" title="导入任务列表" width="600px">
+      <el-input
+        v-model="importJson"
+        type="textarea"
+        :rows="12"
+        placeholder="粘贴 JSON 数组..."
+      />
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmImport">导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -254,16 +255,19 @@ import { taskConfigApi } from '../../api/task_configs'
 
 // ---- 类型定义 ----
 interface TaskRow {
-  task_number: string
-  task_time: string
-  price: number | null
-  quantity: number | null
-  trigger_condition: string
-  task_order: number
-  enabled: boolean
-  pad_strategy: string
-  supplement_strategy: string
-  is_fallback: boolean
+  volume: string
+  priceMode: 'coeff' | 'pad'
+  priceDiffer: string
+  padVolume: string
+  priceIncrease: string
+  maxPrice: string
+  priceMargin: string
+  dataTriggerType: string
+  dataTriggerWindow: string
+  fallbackRef: string
+  isValidate: boolean
+  triggerTime: string
+  status: 'pending' | 'done' | 'failed' | 'paused' | 'cancelled'
 }
 
 interface AttachmentItem {
@@ -292,6 +296,8 @@ const attachments = ref<AttachmentItem[]>([])
 const fileList = ref<UploadFileItem[]>([])
 const saving = ref(false)
 const confirming = ref(false)
+const importDialogVisible = ref(false)
+const importJson = ref('')
 
 const isConfirmed = computed(() => configStatus.value === 'confirmed')
 
@@ -305,39 +311,64 @@ const uploadHeaders = computed(() => {
 // ---- 工具函数 ----
 function createEmptyRow(): TaskRow {
   return {
-    task_number: '',
-    task_time: '',
-    price: null,
-    quantity: null,
-    trigger_condition: '',
-    task_order: tasks.value.length + 1,
-    enabled: true,
-    pad_strategy: 'none',
-    supplement_strategy: 'none',
-    is_fallback: false,
+    volume: '',
+    priceMode: 'coeff',
+    priceDiffer: 'high',
+    padVolume: '',
+    priceIncrease: '',
+    maxPrice: '',
+    priceMargin: '',
+    dataTriggerType: '',
+    dataTriggerWindow: '',
+    fallbackRef: '',
+    isValidate: false,
+    triggerTime: '',
+    status: 'pending',
   }
 }
 
-const PAD_STRATEGY_MAP: Record<string, string> = {
-  none: '无',
-  fixed: '固定垫子',
-  dynamic: '动态垫子',
-  follow: '跟随垫子',
+const STATUS_LABEL_MAP: Record<string, string> = {
+  pending: '待执行',
+  done: '已完成',
+  failed: '失败',
+  paused: '已暂停',
+  cancelled: '已取消',
 }
 
-const SUPPLEMENT_STRATEGY_MAP: Record<string, string> = {
-  none: '无',
-  auto: '自动补量',
-  manual: '手动补量',
-  proportional: '按比例补量',
+const STATUS_TAG_MAP: Record<string, string> = {
+  pending: 'info',
+  done: 'success',
+  failed: 'danger',
+  paused: 'warning',
+  cancelled: '',
 }
 
-function padStrategyLabel(val: string): string {
-  return PAD_STRATEGY_MAP[val] ?? val
+const PRICE_DIFFER_LABEL: Record<string, string> = {
+  high: '高',
+  second: '次',
+  '30%': '30%',
+  '40%': '40%',
+  floor: '底',
+  avg: '均',
 }
 
-function supplementStrategyLabel(val: string): string {
-  return SUPPLEMENT_STRATEGY_MAP[val] ?? val
+function statusLabel(s: string): string {
+  return STATUS_LABEL_MAP[s] ?? s
+}
+
+function statusTagType(s: string): string {
+  return STATUS_TAG_MAP[s] ?? ''
+}
+
+function formatPriceMode(row: TaskRow): string {
+  if (row.priceMode === 'pad') return `垫子 目标量:${row.padVolume}`
+  return `系数 ${PRICE_DIFFER_LABEL[row.priceDiffer] ?? row.priceDiffer}`
+}
+
+function formatDataTrigger(row: TaskRow): string {
+  if (!row.dataTriggerType) return '—'
+  const typeLabel = row.dataTriggerType === 'change' ? '变化触发' : '不变触发'
+  return `${typeLabel} ${row.dataTriggerWindow}ms`
 }
 
 function formatFileSize(bytes: number): string {
@@ -355,8 +386,63 @@ function removeRow(index: number) {
   tasks.value.splice(index, 1)
 }
 
+function copyRow(index: number) {
+  const copy = { ...tasks.value[index], status: 'pending' as const }
+  tasks.value.splice(index + 1, 0, copy)
+}
+
+function pauseRow(row: TaskRow) {
+  row.status = 'paused'
+}
+
+function resumeRow(row: TaskRow) {
+  row.status = 'pending'
+}
+
+function resetRow(row: TaskRow) {
+  row.status = 'pending'
+}
+
+// ---- 导入 ----
+function handleImport() {
+  importJson.value = ''
+  importDialogVisible.value = true
+}
+
+function confirmImport() {
+  try {
+    const parsed = JSON.parse(importJson.value)
+    if (!Array.isArray(parsed)) {
+      ElMessage.error('JSON 必须是数组格式')
+      return
+    }
+    const rows: TaskRow[] = parsed.map((item: Record<string, unknown>) => ({
+      volume: String(item.volume ?? ''),
+      priceMode: (item.priceMode === 'pad' ? 'pad' : 'coeff') as 'coeff' | 'pad',
+      priceDiffer: String(item.priceDiffer ?? 'high'),
+      padVolume: String(item.padVolume ?? ''),
+      priceIncrease: String(item.priceIncrease ?? ''),
+      maxPrice: String(item.maxPrice ?? ''),
+      priceMargin: String(item.priceMargin ?? ''),
+      dataTriggerType: String(item.dataTriggerType ?? ''),
+      dataTriggerWindow: String(item.dataTriggerWindow ?? ''),
+      fallbackRef: String(item.fallbackRef ?? ''),
+      isValidate: Boolean(item.isValidate),
+      triggerTime: String(item.triggerTime ?? ''),
+      status: (['pending', 'done', 'failed', 'paused', 'cancelled'].includes(String(item.status))
+        ? item.status
+        : 'pending') as TaskRow['status'],
+    }))
+    tasks.value = rows
+    importDialogVisible.value = false
+    ElMessage.success(`已导入 ${rows.length} 条任务`)
+  } catch {
+    ElMessage.error('JSON 解析失败，请检查格式')
+  }
+}
+
 // ---- 上传回调 ----
-function handleUploadSuccess(response: unknown, file: UploadFileItem) {
+function handleUploadSuccess(_response: unknown, file: UploadFileItem) {
   ElMessage.success(`${file.name} 上传成功`)
 }
 
@@ -371,7 +457,7 @@ function handleFileRemove(file: UploadFileItem) {
 }
 
 function beforeUpload(file: File): boolean {
-  const MAX_SIZE = 50 * 1024 * 1024 // 50MB
+  const MAX_SIZE = 50 * 1024 * 1024
   if (file.size > MAX_SIZE) {
     ElMessage.error(`文件 ${file.name} 超过 50MB 限制`)
     return false
@@ -390,23 +476,16 @@ async function loadConfig() {
     configStatus.value = data.status ?? ''
     tasks.value = Array.isArray(data.tasks) ? data.tasks : []
     attachments.value = Array.isArray(data.attachments) ? data.attachments : []
-    // 同步 fileList 供 el-upload 展示
     fileList.value = attachments.value.map((a) => ({
       name: a.name || a.filename || '',
       size: a.size,
       url: a.url,
       status: 'success',
     }))
-  } catch (err: unknown) {
-    const error = err as { message?: string }
-    // 404 表示尚未配置，显示空表格
-    if (error?.message?.includes('404') || error?.message?.includes('not found')) {
-      tasks.value = []
-      attachments.value = []
-      configStatus.value = ''
-    } else {
-      ElMessage.error(error?.message || '加载任务配置失败')
-    }
+  } catch {
+    tasks.value = []
+    attachments.value = []
+    configStatus.value = ''
   }
 }
 
@@ -440,7 +519,6 @@ async function handleConfirm() {
   )
   confirming.value = true
   try {
-    // 先保存再确认
     await taskConfigApi.update(auctionId.value, {
       tasks: tasks.value,
       attachments: attachments.value,
@@ -465,7 +543,7 @@ onMounted(() => {
 <style scoped>
 .task-config-page {
   padding: 24px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -491,6 +569,11 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .upload-area {

@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -159,7 +159,8 @@ import { rectificationApi } from '../../api/rectifications'
 import type { RectificationItem } from '../../api/types'
 
 const route = useRoute()
-const rid = route.params.rid as string
+const props = defineProps<{ retrospectiveId?: string }>()
+const rid = computed(() => props.retrospectiveId || route.params.rid as string || '')
 
 const items = ref<RectificationItem[]>([])
 const loading = ref(false)
@@ -212,12 +213,13 @@ function rowClassName({ row }: { row: RectificationItem }): string {
 
 // ── 加载列表 ──────────────────────────────────────────────
 async function loadItems() {
+  if (!rid.value) return
   loading.value = true
   try {
-    const data = await rectificationApi.list(rid) as unknown as RectificationItem[]
+    const data = await rectificationApi.list(rid.value) as unknown as RectificationItem[]
     items.value = data
-  } catch (err: unknown) {
-    ElMessage.error(`加载整改事项失败：${err instanceof Error ? err.message : String(err)}`)
+  } catch {
+    // 尚未创建整改事项，静默忽略
   } finally {
     loading.value = false
   }
@@ -324,7 +326,7 @@ async function submitCreate() {
   if (!valid) return
   creating.value = true
   try {
-    const data = await rectificationApi.create(rid, {
+    const data = await rectificationApi.create(rid.value, {
       title: createForm.title,
       description: createForm.description || null,
       measures: createForm.measures,

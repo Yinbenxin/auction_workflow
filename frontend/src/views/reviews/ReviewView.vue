@@ -206,12 +206,8 @@ async function fetchReview() {
     if (review.value?.checklist) {
       syncChecklist(review.value.checklist)
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '加载复核信息失败'
-    // 404 表示尚未发起复核，不报错
-    if (!msg.includes('404') && !msg.includes('not found')) {
-      ElMessage.error(msg)
-    }
+  } catch {
+    // 尚未发起复核，静默忽略
   } finally {
     loading.value = false
   }

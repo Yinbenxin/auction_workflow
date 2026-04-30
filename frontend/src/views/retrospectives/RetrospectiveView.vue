@@ -231,12 +231,8 @@ async function loadRetrospective() {
     const data = await retrospectiveApi.get(auctionId) as unknown as Retrospective
     retrospective.value = data
     fillForm(data)
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
-    // 404 表示尚未创建，忽略
-    if (!msg.includes('404') && !msg.includes('not found')) {
-      ElMessage.error(`加载复盘报告失败：${msg}`)
-    }
+  } catch {
+    // 尚未创建复盘报告，静默忽略
   }
 }
 
