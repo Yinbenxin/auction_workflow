@@ -10,7 +10,6 @@ export interface User {
   id: string
   username: string
   full_name: string
-  role: string
   is_active: boolean
   created_at: string
 }
@@ -20,10 +19,13 @@ export interface Auction {
   id: string
   name: string
   auction_date: string
+  description: string | null
   current_phase: number
   phase_statuses: Record<string, string>
   basic_info: Record<string, unknown>
   history_analysis: Record<string, unknown>
+  strategy_data: Record<string, unknown>
+  roles: Record<string, string>
   version: number
   created_by: string
   created_at: string

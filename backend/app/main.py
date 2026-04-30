@@ -2,6 +2,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.core.config import settings
 from app.api.v1 import router as api_v1_router
@@ -35,6 +37,10 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# 静态文件服务（上传附件）
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/health")

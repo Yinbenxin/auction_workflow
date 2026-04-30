@@ -179,8 +179,11 @@ import type { StrategyVersion } from '../../api/types'
 const route = useRoute()
 const router = useRouter()
 
+const props = defineProps<{ inlineMode?: boolean; inlineVid?: string }>()
+const emit = defineEmits<{ (e: 'navigate-back'): void }>()
+
 const auctionId = computed(() => route.params.id as string)
-const vid = computed(() => route.params.vid as string | undefined)
+const vid = computed(() => props.inlineVid ?? route.params.vid as string | undefined)
 const isEdit = computed(() => !!vid.value && vid.value !== 'new')
 
 const loading = ref(false)
@@ -314,7 +317,8 @@ async function handleSubmit() {
       await strategyApi.create(auctionId.value, payload)
       ElMessage.success('策略版本已创建')
     }
-    router.push(`/auctions/${auctionId.value}/strategies`)
+    if (props.inlineMode) emit('navigate-back')
+    else router.push(`/auctions/${auctionId.value}/strategies`)
   } catch (err: unknown) {
     ElMessage.error((err as Error).message || '保存失败')
   } finally {
@@ -323,7 +327,8 @@ async function handleSubmit() {
 }
 
 function handleCancel() {
-  router.push(`/auctions/${auctionId.value}/strategies`)
+  if (props.inlineMode) emit('navigate-back')
+  else router.push(`/auctions/${auctionId.value}/strategies`)
 }
 
 onMounted(loadStrategy)

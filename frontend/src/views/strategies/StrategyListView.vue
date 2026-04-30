@@ -142,6 +142,9 @@ import { strategyApi } from '../../api/strategies'
 import { useAuthStore } from '../../stores/auth'
 import type { StrategyVersion } from '../../api/types'
 
+const props = defineProps<{ inlineMode?: boolean }>()
+const emit = defineEmits<{ (e: 'navigate-to-form', vid: string): void }>()
+
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -228,11 +231,13 @@ async function fetchStrategies() {
 }
 
 function goToCreate() {
-  router.push(`/auctions/${auctionId.value}/strategies/new`)
+  if (props.inlineMode) emit('navigate-to-form', 'new')
+  else router.push(`/auctions/${auctionId.value}/strategies/new`)
 }
 
 function goToEdit(vid: string) {
-  router.push(`/auctions/${auctionId.value}/strategies/${vid}/edit`)
+  if (props.inlineMode) emit('navigate-to-form', vid)
+  else router.push(`/auctions/${auctionId.value}/strategies/${vid}/edit`)
 }
 
 async function handleSubmit(row: StrategyVersion) {

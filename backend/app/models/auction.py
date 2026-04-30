@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, ForeignKey, Integer, SmallInteger, String, text
+from sqlalchemy import Date, ForeignKey, Integer, SmallInteger, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +29,7 @@ class Auction(Base):
     # --- 基本信息 ---
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     auction_date: Mapped[date] = mapped_column(Date, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- 阶段管理 ---
     current_phase: Mapped[int] = mapped_column(
@@ -49,6 +50,18 @@ class Auction(Base):
         server_default=text("'{}'::jsonb"),
     )
     history_analysis: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    strategy_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+
+    # --- 项目角色分配（role_name -> user_id string）---
+    roles: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         server_default=text("'{}'::jsonb"),
