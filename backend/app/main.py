@@ -22,9 +22,11 @@ app.add_middleware(
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail
+    message = detail.get("message", str(detail)) if isinstance(detail, dict) else detail
     return JSONResponse(
         status_code=exc.status_code,
-        content={"code": exc.status_code, "data": None, "message": exc.detail},
+        content={"code": exc.status_code, "data": None, "message": message},
     )
 
 
