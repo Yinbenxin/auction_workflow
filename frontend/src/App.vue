@@ -26,6 +26,13 @@
             <el-icon><User /></el-icon>
             <span>个人信息</span>
           </el-menu-item>
+          <el-menu-item
+            v-if="authStore.user?.system_role === 'root'"
+            index="/admin/users"
+          >
+            <el-icon><Setting /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
         </el-menu>
       </aside>
       <main class="app-main">
@@ -41,7 +48,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { User, UserFilled, List } from '@element-plus/icons-vue'
+import { User, UserFilled, List, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from './stores/auth'
 
 const route = useRoute()

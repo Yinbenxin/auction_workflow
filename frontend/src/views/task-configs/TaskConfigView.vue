@@ -159,12 +159,12 @@
         <el-upload
           v-if="!isConfirmed"
           :show-file-list="false"
-          accept=".pdf"
+          accept=".pdf,.doc,.docx"
           :http-request="uploadAttachmentRequest"
           :before-upload="beforeUpload"
           multiple
         >
-          <el-button size="small" :loading="uploadingAttachment">上传 PDF</el-button>
+          <el-button size="small" :loading="uploadingAttachment">上传文件</el-button>
         </el-upload>
         <div class="attachment-list" v-if="attachments.length">
           <div v-for="(file, i) in attachments" :key="i" class="attachment-item">

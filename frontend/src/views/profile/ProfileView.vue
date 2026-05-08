@@ -6,6 +6,25 @@
       <el-descriptions :column="1" border>
         <el-descriptions-item label="用户名">{{ user.username }}</el-descriptions-item>
         <el-descriptions-item label="姓名">{{ user.full_name }}</el-descriptions-item>
+        <el-descriptions-item label="业务角色">
+          <template v-if="userRoleInfos.length">
+            <el-tag
+              v-for="r in userRoleInfos"
+              :key="r.key"
+              type="primary"
+              style="margin-right: 6px"
+            >{{ r.name }}</el-tag>
+          </template>
+          <span v-else style="color: #909399">暂未分配</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="角色说明">
+          <template v-if="userRoleInfos.length">
+            <div v-for="r in userRoleInfos" :key="r.key" style="line-height: 1.8">
+              <b>{{ r.name }}：</b>{{ r.desc }}
+            </div>
+          </template>
+          <span v-else style="color: #909399">—</span>
+        </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="user.is_active ? 'success' : 'danger'">
             {{ user.is_active ? '正常' : '已禁用' }}
@@ -36,15 +55,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { authApi } from '../../api/auth'
 import { storeToRefs } from 'pinia'
+import { USER_ROLE_DEFS } from '../../constants/userRoles'
 
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
+
+const userRoleInfos = computed(() =>
+  USER_ROLE_DEFS.filter(r => user.value?.user_roles?.includes(r.key))
+)
 
 onMounted(() => {
   if (!user.value && authStore.token) {

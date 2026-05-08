@@ -47,6 +47,15 @@ async def get_current_user(
     return user
 
 
+async def require_root(current_user=Depends(get_current_user)):
+    if current_user.system_role != "root":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": 403, "data": None, "message": "需要管理员权限"},
+        )
+    return current_user
+
+
 def require_auction_role(*roles: str) -> Callable:
     """
     Factory that returns a FastAPI dependency enforcing that the current user

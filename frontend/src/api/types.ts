@@ -11,6 +11,8 @@ export interface User {
   username: string
   full_name: string
   is_active: boolean
+  system_role: 'root' | 'user'
+  user_roles: string[]
   created_at: string
 }
 

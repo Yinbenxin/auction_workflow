@@ -71,16 +71,6 @@ async def create_retrospective(
     """
     auction = await _get_auction_or_404(auction_id, db)
 
-    if auction.phase_statuses.get("7") != "completed":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": 400,
-                "data": None,
-                "message": "竞拍执行阶段（阶段7）尚未完成，无法创建复盘报告",
-            },
-        )
-
     # 同一竞拍只允许一条复盘报告
     existing = await db.execute(
         select(Retrospective).where(Retrospective.auction_id == auction_id)

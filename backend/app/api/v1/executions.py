@@ -45,7 +45,7 @@ async def create_execution_log(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_role("trader")),
 ) -> dict:
-    """新增执行日志条目。前置校验：竞拍阶段 6 必须为 executable。"""
+    """新增执行日志条目。"""
     # 查询竞拍
     result = await db.execute(select(Auction).where(Auction.id == auction_id))
     auction: Auction | None = result.scalar_one_or_none()
@@ -53,13 +53,6 @@ async def create_execution_log(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": 404, "data": None, "message": "竞拍不存在"},
-        )
-
-    # 前置校验：阶段 6 必须标记为 executable
-    if auction.phase_statuses.get("6") != "executable":
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": 422, "data": None, "message": "竞拍尚未标记为可执行（阶段 6 需为 executable）"},
         )
 
     log = ExecutionLog(

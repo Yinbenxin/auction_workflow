@@ -48,15 +48,15 @@
             :disabled="!canEditBasicInfo"
           />
         </el-form-item>
-        <el-form-item label="附件（PDF）">
+        <el-form-item label="附件（PDF/Word）">
           <div class="attachment-area">
             <el-upload
               v-if="canEditBasicInfo"
               :show-file-list="false"
-              accept=".pdf"
+              accept=".pdf,.doc,.docx"
               :http-request="uploadBasicInfoRequest"
             >
-              <el-button size="small" :loading="uploadingBasicInfo">上传 PDF</el-button>
+              <el-button size="small" :loading="uploadingBasicInfo">上传文件</el-button>
             </el-upload>
             <div class="attachment-list" v-if="basicInfoAttachments.length">
               <div v-for="att in basicInfoAttachments" :key="att.id" class="attachment-item">
@@ -124,15 +124,15 @@
             :disabled="!canEditHistoryAnalysis"
           />
         </el-form-item>
-        <el-form-item label="附件（PDF）">
+        <el-form-item label="附件（PDF/Word）">
           <div class="attachment-area">
             <el-upload
               v-if="canEditHistoryAnalysis"
               :show-file-list="false"
-              accept=".pdf"
+              accept=".pdf,.doc,.docx"
               :http-request="uploadHistoryAnalysisRequest"
             >
-              <el-button size="small" :loading="uploadingHistoryAnalysis">上传 PDF</el-button>
+              <el-button size="small" :loading="uploadingHistoryAnalysis">上传文件</el-button>
             </el-upload>
             <div class="attachment-list" v-if="historyAnalysisAttachments.length">
               <div v-for="att in historyAnalysisAttachments" :key="att.id" class="attachment-item">

@@ -28,7 +28,6 @@ async def main() -> None:
                 id=uuid.uuid4(),
                 username=u["username"],
                 hashed_password=get_password_hash(PASSWORD),
-                role=u["role"],
                 full_name=u["full_name"],
             )
             db.add(user)

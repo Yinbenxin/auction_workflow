@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -82,6 +83,11 @@ const router = createRouter({
       name: 'Rectification',
       component: () => import('../views/retrospectives/RectificationView.vue'),
     },
+    {
+      path: '/admin/users',
+      name: 'UserManagement',
+      component: () => import('../views/admin/UserManagementView.vue'),
+    },
   ],
 })
 
@@ -89,10 +95,15 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('token')
   if (to.name !== 'Login' && to.name !== 'Register' && !token) {
-    next({ name: 'Login' })
-  } else {
-    next()
+    return next({ name: 'Login' })
   }
+  if (to.name === 'UserManagement') {
+    const authStore = useAuthStore()
+    if (authStore.user?.system_role !== 'root') {
+      return next({ name: 'AuctionList' })
+    }
+  }
+  next()
 })
 
 export default router

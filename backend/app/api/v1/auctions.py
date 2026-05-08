@@ -28,29 +28,6 @@ from app.services.strategy_service import update_with_optimistic_lock
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# 阶段门控
-# ---------------------------------------------------------------------------
-
-PHASE_GATES: dict[int, object] = {
-    2: lambda a: a.phase_statuses.get("1") == "confirmed",
-    3: lambda a: True,  # 软阻断，允许继续
-    4: lambda a: a.phase_statuses.get("3") == "has_final_strategy",
-    5: lambda a: a.phase_statuses.get("4") == "passed",
-    8: lambda a: a.phase_statuses.get("7") == "completed",
-}
-
-
-def check_phase_gate(auction: Auction, target_phase: int) -> None:
-    """校验前置阶段是否满足，不满足时抛 HTTP 400。"""
-    gate = PHASE_GATES.get(target_phase)
-    if gate and not gate(auction):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"前置阶段未完成，无法进入阶段 {target_phase}",
-        )
-
-
-# ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
 
@@ -259,7 +236,6 @@ async def update_history_analysis(
 ) -> dict:
     """更新阶段02历史分析数据（strategy_owner 角色）。确认后仍可修改，状态回退为 in_progress。"""
     auction = await get_auction_or_404(db, auction_id)
-    check_phase_gate(auction, 2)
     # 角色校验：strategy_owner 或 data_analyst 均可编辑
     roles = auction.roles or {}
     allowed = {str(roles.get("strategy_owner")), str(roles.get("data_analyst"))}
@@ -352,12 +328,18 @@ async def upload_basic_info_attachment(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
-    """上传阶段01附件（仅限 PDF）。返回附件元数据，前端负责将其追加到 basic_info.attachments 并保存。"""
+    """上传阶段01附件（PDF 或 Word）。返回附件元数据，前端负责将其追加到 basic_info.attachments 并保存。"""
     auction = await get_auction_or_404(db, auction_id)
     if str((auction.roles or {}).get("business_owner")) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅 business_owner 可上传附件")
-    if file.content_type not in ("application/pdf", "application/octet-stream"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": 400, "data": None, "message": "仅支持 PDF 文件"})
+    allowed_types = (
+        "application/pdf",
+        "application/octet-stream",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": 400, "data": None, "message": "仅支持 PDF 或 Word 文件"})
     content = await file.read()
     meta = _save_upload("basic_info", auction_id, content, file.filename or "attachment.pdf")
     return ok(data=meta)
@@ -397,14 +379,20 @@ async def upload_history_analysis_attachment(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
-    """上传阶段02附件（仅限 PDF）。"""
+    """上传阶段02附件（PDF 或 Word）。"""
     auction = await get_auction_or_404(db, auction_id)
     roles = auction.roles or {}
     allowed = {str(roles.get("strategy_owner")), str(roles.get("data_analyst"))}
     if str(current_user.id) not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅 strategy_owner 或 data_analyst 可上传附件")
-    if file.content_type not in ("application/pdf", "application/octet-stream"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": 400, "data": None, "message": "仅支持 PDF 文件"})
+    allowed_types = (
+        "application/pdf",
+        "application/octet-stream",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"code": 400, "data": None, "message": "仅支持 PDF 或 Word 文件"})
     content = await file.read()
     meta = _save_upload("history_analysis", auction_id, content, file.filename or "attachment.pdf")
     return ok(data=meta)
